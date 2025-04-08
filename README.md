@@ -1,66 +1,101 @@
-## Foundry
+# SoulBoundToken
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+A SoulBoundToken contract for Optimism with administrative whitelist and blacklist functionality. Only 1 token can be held per address. Tokens can not be transferred or approved.
 
-Foundry consists of:
+## Roles
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+There are 4 key roles in this system:
 
-## Documentation
+1. the owner
+2. the admins
+3. whitelisted
+4. blacklisted
 
-https://book.getfoundry.sh/
+### Owner
 
-## Usage
+- can assign and revoke admin role
+- can set the baseURI
 
-### Build
+### Admins
 
-```shell
-$ forge build
-```
+- can assign and revoke whitelisted and blacklisted roles
+- can enable and disable whitelist
+- can mint tokens
 
-### Test
+### Whitelisted
 
-```shell
-$ forge test
-```
+- can mint a token if whitelist is enabled
 
-### Format
+### Blacklisted
 
-```shell
-$ forge fmt
-```
+- can't be minted a token
+- if previously minted a token, their token is burned
+- if on whitelist, removed from whitelist
 
-### Gas Snapshots
+## Valid States
 
-```shell
-$ forge snapshot
-```
+There are 2 valid states in this system:
 
-### Anvil
+1. whitelist enabled ✅
+2. whitelist disabled ❌
 
-```shell
-$ anvil
-```
+### Whitelist Enabled
 
-### Deploy
+- whitelisted accounts can mint a token
+- admins can mint tokens to whitelisted accounts
 
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
+### Whitelist Disabled
 
-### Cast
+- admins can mint tokens to anyone who isn't blacklisted
 
-```shell
-$ cast <subcommand>
-```
+## External Functions (that change state)
 
-### Help
+### Mint
 
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+- `mintAsAdmin(address)` - _onlyAdmin_
+  - admin passes an address to mint it a token
+- `mintAsWhitelisted()` - only when whitelist enabled
+  - whitelisted user calls to mint themself a token
+- `batchMintAsAdmin(address[] memory)` - _onlyAdmin_
+  - admin passes an array of addresses to mint each one a token
+  - each mint in the array will cost roughly the same gas as an individual `mintAsAdmin` call
+
+### Whitelist
+
+- `addToWhitelist(address)` - _onlyAdmin_
+  - admin passes an address to add it to whitelist
+- `batchAddToWhitelist(address[] memory)` - _onlyAdmin_
+  - admin passes an array of addresses to add each to whitelist
+- `removeFromWhitelist(address)` - _onlyAdmin_
+  - admin passes an address to remove it from whitelist
+- `batchRemoveFromWhitelist(address[] memory)` - _onlyAdmin_
+  - admin passes an array of addresses to remove each from whitelist
+- `setWhitelistEnabled(bool)` - _onlyAdmin_
+  - admin passes a bool indicating whether whitelist is enabled or not
+
+### Blacklist
+
+- `addToBlacklist(address)` - _onlyAdmin_
+  - admin passes an address to add it to blacklist
+- `batchAddToBlacklist(address[] memory)` - _onlyAdmin_
+  - admin passes an array of addresses to add each to blacklist
+- `removeFromBlacklist(address)` - _onlyAdmin_
+  - admin passes an address to remove it from blacklist
+- `batchRemoveFromBlacklist(address[] memory)` - _onlyAdmin_
+  - admin passes an array of addresses to remove each from blacklist
+
+### Assign/Revoke Admin
+
+- `setAdmin(address,bool)` - _onlyOwner_
+  - owner passes an address and a bool indicating whether that address is an admin or not
+- `batchSetAdmin(address[] memory,bool)` - _onlyOwner_
+  - owner passes an array of addresses and a bool indicating whether those addresses are admins or not
+
+### Base URI
+
+- `setBaseURI(string memory)` - _onlyOwner_
+  - owner passes a string to set the base URI for the token metadata
+
+## Comments on Design Choices
+
+The `addToWhitelist(address)` and `removeFromWhitelist(address)` functions could be combined into a `setWhitelist(address,bool)`, but have been separated in the interest of simplicity and readability. The same can be said for the batch add/remove and blacklist equivalents.
