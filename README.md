@@ -48,7 +48,7 @@ There are 2 valid states in this system:
 
 - admins can mint tokens to anyone who isn't blacklisted
 
-## Constructor/Deployment
+## Constructor/Deployment
 
 When the SBT contract is deployed, values must be given for the token `name`, `symbol`, `baseURI` and a bool indicating whether whitelist is initially enabled or not.
 
