@@ -34,6 +34,7 @@ contract BaseTest is Test {
                                  SET UP
     //////////////////////////////////////////////////////////////*/
     function setUp() public virtual {
+        _forkOptimism();
         _deployInfra();
 
         /// @dev define actors
@@ -50,12 +51,14 @@ contract BaseTest is Test {
     /*//////////////////////////////////////////////////////////////
                                  DEPLOY
     //////////////////////////////////////////////////////////////*/
-    function _deployInfra() internal {
+    function _forkOptimism() internal {
         /// @dev fork Optimism mainnet
         optimismFork = vm.createSelectFork(OPTIMISM_MAINNET_RPC_URL, OPTIMISM_MAINNET_STARTING_BLOCK);
         /// @dev sanity check
         assertEq(block.chainid, 10);
+    }
 
+    function _deployInfra() internal {
         /// @dev run deploy script
         DeploySoulBoundToken deploy = new DeploySoulBoundToken();
         sbt = deploy.run();

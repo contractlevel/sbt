@@ -62,7 +62,7 @@ When the SBT contract is deployed, values must be given for the token `name`, `s
   - whitelisted user calls to mint themself a token
 - `batchMintAsAdmin(address[] memory)` - _onlyAdmin_
   - admin passes an array of addresses to mint each one a token
-  - each mint in the array will cost roughly the same gas as an individual `mintAsAdmin` call
+  - each mint in the array will cost roughly the same gas as an individual `mintAsAdmin` call - _this needs to be reviewed, we should be able to make it more gas efficient_
 
 ### Whitelist
 

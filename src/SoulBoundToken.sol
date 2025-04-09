@@ -217,6 +217,8 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     function _mintSoulBoundToken(address account) internal returns (uint256) {
         if (balanceOf(account) > 0) revert SoulBoundToken__AlreadyMinted(account);
 
+        // @review - can looping through this be optimized?
+        // https://github.com/crytic/slither/wiki/Detector-Documentation#costly-operations-inside-a-loop
         uint256 tokenId = s_tokenIdCounter;
         s_tokenIdCounter++;
         _safeMint(account, tokenId);
