@@ -259,6 +259,7 @@ contract Handler is Test {
             /// @dev sanity conditions
             // _ifWhitelistedThenRemove(admin, account);
             _ifBlacklistedThenRemove(admin, account);
+            if (g_holders[account]) _updateBurnGhosts(account);
 
             /// @dev add account to batch
             accountsToAdd[i] = account;
@@ -277,6 +278,7 @@ contract Handler is Test {
         /// @dev sanity conditions
         _ifWhitelistedThenRemove(admin, account);
         _ifNotBlacklistedThenAdd(admin, account);
+        if (g_holders[account]) _updateBurnGhosts(account);
 
         /// @dev remove from blacklist
         _removeFromBlacklist(admin, account);
@@ -300,6 +302,9 @@ contract Handler is Test {
             _ifWhitelistedThenRemove(admin, account);
             _ifNotBlacklistedThenAdd(admin, account);
 
+            /// @dev update blacklist ghosts
+            _updateBlacklistGhosts(account, false);
+
             /// @dev add account to batch
             accountsToRemove[i] = account;
         }
@@ -309,12 +314,12 @@ contract Handler is Test {
         sbt.batchRemoveFromBlacklist(accountsToRemove);
     }
 
-    function setAdmin(uint256 adminSeed, bool isAdmin) external {
+    function setAdmin(uint256 adminSeed) external {
         /// @dev get admin
         address admin = _createOrGetAccount(adminSeed);
 
         /// @dev set admin
-        _setAdmin(admin, isAdmin);
+        _setAdmin(admin, !sbt.getIsAdmin(admin));
     }
 
     function batchSetAdmin(uint256 initialSeed, bool isAdmin) external {
@@ -328,6 +333,8 @@ contract Handler is Test {
             uint256 adminSeed = uint256(keccak256(abi.encode(initialSeed, i)));
             address account = _createAccount(adminSeed);
 
+            if (sbt.getIsAdmin(account) == isAdmin) _setAdmin(account, !isAdmin);
+
             /// @dev update admin ghosts
             _updateAdminGhosts(account, isAdmin);
 
@@ -338,6 +345,12 @@ contract Handler is Test {
         /// @dev execute batch set admin
         _changePrank(owner);
         sbt.batchSetAdmin(adminsToSet, isAdmin);
+    }
+
+    function setBaseURI(bytes32 baseURIBytes32) external {
+        string memory baseURI = string(abi.encodePacked(baseURIBytes32));
+        _changePrank(owner);
+        sbt.setBaseURI(baseURI);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -363,6 +376,7 @@ contract Handler is Test {
     }
 
     function _addToBlacklist(address admin, address account) internal {
+        if (g_holders[account]) _updateBurnGhosts(account);
         g_blacklisted[account] = true;
         blacklisted.add(account);
         _changePrank(admin);
@@ -375,24 +389,23 @@ contract Handler is Test {
     }
 
     function _ifNotWhitelistedThenAdd(address admin, address account) internal {
-        if (!g_whitelisted[account]) _addToWhitelist(admin, account);
+        if (!sbt.getWhitelisted(account)) _addToWhitelist(admin, account);
     }
 
     function _ifWhitelistedThenRemove(address admin, address account) internal {
-        if (g_whitelisted[account]) _removeFromWhitelist(admin, account);
+        if (sbt.getWhitelisted(account)) _removeFromWhitelist(admin, account);
     }
 
     function _ifNotBlacklistedThenAdd(address admin, address account) internal {
-        if (!g_blacklisted[account]) _addToBlacklist(admin, account);
+        if (!sbt.getBlacklisted(account)) _addToBlacklist(admin, account);
     }
 
     function _ifBlacklistedThenRemove(address admin, address account) internal {
-        if (g_blacklisted[account]) _removeFromBlacklist(admin, account);
+        if (sbt.getBlacklisted(account)) _removeFromBlacklist(admin, account);
     }
 
     function _removeFromBlacklist(address admin, address account) internal {
-        g_blacklisted[account] = false;
-        blacklisted.remove(account);
+        _updateBlacklistGhosts(account, false);
         _changePrank(admin);
         sbt.removeFromBlacklist(account);
     }
@@ -402,6 +415,12 @@ contract Handler is Test {
         whitelisted.remove(account);
         _changePrank(admin);
         sbt.removeFromWhitelist(account);
+    }
+
+    function _updateBlacklistGhosts(address account, bool isBlacklisted) internal {
+        g_blacklisted[account] = isBlacklisted;
+        if (isBlacklisted) blacklisted.add(account);
+        else blacklisted.remove(account);
     }
 
     function _updateAdminGhosts(address admin, bool isAdmin) internal {
@@ -419,6 +438,15 @@ contract Handler is Test {
     /*//////////////////////////////////////////////////////////////
                                 UTILITY
     //////////////////////////////////////////////////////////////*/
+    /// @dev helper function for looping through holders in the system
+    function forEachHolder(function(address) external func) external {
+        if (holders.length() == 0) return;
+
+        for (uint256 i; i < holders.length(); ++i) {
+            func(holders.at(i));
+        }
+    }
+
     /// @dev helper function for looping through blacklisted accounts in the system
     function forEachBlacklisted(function(address) external func) external {
         if (blacklisted.length() == 0) return;

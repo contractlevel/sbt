@@ -21,24 +21,26 @@ contract Invariant is StdInvariant, BaseTest {
         handler = new Handler(sbt, owner);
 
         /// @dev define appropriate function selectors
-        bytes4[] memory selectors = new bytes4[](13);
+        bytes4[] memory selectors = new bytes4[](15);
         /// @dev mint functions
         selectors[0] = Handler.mintAsAdmin.selector;
         selectors[1] = Handler.mintAsWhitelisted.selector;
         selectors[2] = Handler.batchMintAsAdmin.selector;
         /// @dev whitelist functions
-        selectors[3] = Handler.addToWhitelist.selector;
-        selectors[4] = Handler.removeFromWhitelist.selector;
-        selectors[5] = Handler.batchAddToWhitelist.selector;
-        selectors[6] = Handler.batchRemoveFromWhitelist.selector;
+        selectors[3] = Handler.setWhitelistEnabled.selector;
+        selectors[4] = Handler.addToWhitelist.selector;
+        selectors[5] = Handler.removeFromWhitelist.selector;
+        selectors[6] = Handler.batchAddToWhitelist.selector;
+        selectors[7] = Handler.batchRemoveFromWhitelist.selector;
         /// @dev blacklist functions
-        selectors[7] = Handler.addToBlacklist.selector;
-        selectors[8] = Handler.removeFromBlacklist.selector;
-        selectors[9] = Handler.batchAddToBlacklist.selector;
-        selectors[10] = Handler.batchRemoveFromBlacklist.selector;
+        selectors[8] = Handler.addToBlacklist.selector;
+        selectors[9] = Handler.removeFromBlacklist.selector;
+        selectors[10] = Handler.batchAddToBlacklist.selector;
+        selectors[11] = Handler.batchRemoveFromBlacklist.selector;
         /// @dev owner functions
-        selectors[11] = Handler.setAdmin.selector;
-        selectors[12] = Handler.batchSetAdmin.selector;
+        selectors[12] = Handler.setAdmin.selector;
+        selectors[13] = Handler.batchSetAdmin.selector;
+        selectors[14] = Handler.setBaseURI.selector;
 
         /// @dev target handler and appropriate function selectors
         targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
@@ -58,5 +60,15 @@ contract Invariant is StdInvariant, BaseTest {
 
     function checkBlacklistedBalanceOfZero(address blacklisted) external view {
         assertEq(sbt.balanceOf(blacklisted), 0, "Invariant violated: Blacklisted account should not hold the token.");
+    }
+
+    // Holder should not have more than 1 token:
+    // loop through all holders and assert balance is 1
+    function invariant_holder_oneToken() public {
+        handler.forEachHolder(this.checkHolderBalanceOfOne);
+    }
+
+    function checkHolderBalanceOfOne(address holder) external view {
+        assertEq(sbt.balanceOf(holder), 1, "Invariant violated: Holder should not have more than 1 token.");
     }
 }
