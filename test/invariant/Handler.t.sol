@@ -59,6 +59,11 @@ contract Handler is Test {
     /// @dev track the number of batchMintAsAdmin calls
     uint256 public g_batchMintAsAdminCalls;
 
+    /// @dev track the total minted
+    uint256 public g_totalMinted;
+    /// @dev track the total burned
+    uint256 public g_totalBurned;
+
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
@@ -359,12 +364,14 @@ contract Handler is Test {
     function _updateMintGhosts(address account) internal {
         g_holders[account] = true;
         g_amountOfHolders++;
+        g_totalMinted++;
         holders.add(account);
     }
 
     function _updateBurnGhosts(address account) internal {
         g_holders[account] = false;
         g_amountOfHolders--;
+        g_totalBurned++;
         holders.remove(account);
     }
 

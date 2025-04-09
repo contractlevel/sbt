@@ -71,4 +71,13 @@ contract Invariant is StdInvariant, BaseTest {
     function checkHolderBalanceOfOne(address holder) external view {
         assertEq(sbt.balanceOf(holder), 1, "Invariant violated: Holder should not have more than 1 token.");
     }
+
+    // Total supply should be total minted minus total burned:
+    function invariant_totalSupply_totalMintedMinusTotalBurned() public view {
+        assertEq(
+            sbt.totalSupply(),
+            handler.g_totalMinted() - handler.g_totalBurned(),
+            "Invariant violated: Total supply should be total minted minus total burned."
+        );
+    }
 }
