@@ -72,8 +72,7 @@ contract Handler is Test {
     //////////////////////////////////////////////////////////////*/
     function mintAsAdmin(uint256 adminSeed, uint256 accountSeed) external {
         /// @dev get actors
-        address admin = _createOrGetAccount(adminSeed);
-        if (!sbt.getIsAdmin(admin)) _setAdmin(admin, true);
+        address admin = _createOrGetAdmin(adminSeed);
         address account = _createOrGetAccount(accountSeed);
 
         /// @dev sanity conditions
@@ -92,8 +91,7 @@ contract Handler is Test {
 
     function mintAsWhitelisted(uint256 adminSeed, uint256 accountSeed) external {
         /// @dev get actors
-        address admin = _createOrGetAccount(adminSeed);
-        _setAdmin(admin, true);
+        address admin = _createOrGetAdmin(adminSeed);
         address account = _createOrGetAccount(accountSeed);
 
         /// @dev sanity conditions
@@ -113,7 +111,7 @@ contract Handler is Test {
 
     function batchMintAsAdmin(uint256 adminSeed) external {
         /// @dev get admin
-        address admin = _createOrGetAccount(adminSeed);
+        address admin = _createOrGetAdmin(adminSeed);
 
         /// @dev determine batch size (1 to 20 accounts)
         uint256 length = bound(adminSeed, 1, 20);
@@ -142,9 +140,18 @@ contract Handler is Test {
         sbt.batchMintAsAdmin(accountsToMint);
     }
 
+    function setWhitelistEnabled(uint256 adminSeed) external {
+        /// @dev get admin
+        address admin = _createOrGetAdmin(adminSeed);
+
+        /// @dev set whitelist enabled
+        _changePrank(admin);
+        sbt.setWhitelistEnabled(!sbt.getWhitelistEnabled());
+    }
+
     function addToWhitelist(uint256 adminSeed, uint256 accountSeed) external {
         /// @dev get actors
-        address admin = _createOrGetAccount(adminSeed);
+        address admin = _createOrGetAdmin(adminSeed);
         address account = _createAccount(accountSeed);
 
         /// @dev sanity conditions
@@ -157,7 +164,7 @@ contract Handler is Test {
 
     function batchAddToWhitelist(uint256 adminSeed) external {
         /// @dev get admin
-        address admin = _createOrGetAccount(adminSeed);
+        address admin = _createOrGetAdmin(adminSeed);
 
         /// @dev determine batch size (1 to 20 accounts)
         uint256 length = bound(adminSeed, 1, 20);
@@ -184,7 +191,7 @@ contract Handler is Test {
 
     function removeFromWhitelist(uint256 adminSeed, uint256 accountSeed) external {
         /// @dev get actors
-        address admin = _createOrGetAccount(adminSeed);
+        address admin = _createOrGetAdmin(adminSeed);
         address account = _createOrGetAccount(accountSeed);
 
         /// @dev sanity conditions
@@ -197,7 +204,7 @@ contract Handler is Test {
 
     function batchRemoveFromWhitelist(uint256 adminSeed) external {
         /// @dev get admin
-        address admin = _createOrGetAccount(adminSeed);
+        address admin = _createOrGetAdmin(adminSeed);
 
         /// @dev determine batch size (1 to 20 accounts)
         uint256 length = bound(adminSeed, 1, 20);
@@ -224,7 +231,7 @@ contract Handler is Test {
 
     function addToBlacklist(uint256 adminSeed, uint256 accountSeed) external {
         /// @dev get actors
-        address admin = _createOrGetAccount(adminSeed);
+        address admin = _createOrGetAdmin(adminSeed);
         address account = _createAccount(accountSeed);
 
         /// @dev sanity conditions
@@ -237,7 +244,7 @@ contract Handler is Test {
 
     function batchAddToBlacklist(uint256 adminSeed) external {
         /// @dev get admin
-        address admin = _createOrGetAccount(adminSeed);
+        address admin = _createOrGetAdmin(adminSeed);
 
         /// @dev determine batch size (1 to 20 accounts)
         uint256 length = bound(adminSeed, 1, 20);
@@ -264,7 +271,7 @@ contract Handler is Test {
 
     function removeFromBlacklist(uint256 adminSeed, uint256 accountSeed) external {
         /// @dev get actors
-        address admin = _createOrGetAccount(adminSeed);
+        address admin = _createOrGetAdmin(adminSeed);
         address account = _createOrGetAccount(accountSeed);
 
         /// @dev sanity conditions
@@ -277,7 +284,7 @@ contract Handler is Test {
 
     function batchRemoveFromBlacklist(uint256 adminSeed) external {
         /// @dev get admin
-        address admin = _createOrGetAccount(adminSeed);
+        address admin = _createOrGetAdmin(adminSeed);
 
         /// @dev determine batch size (1 to 20 accounts)
         uint256 length = bound(adminSeed, 1, 20);
@@ -441,6 +448,11 @@ contract Handler is Test {
     function _createOrGetAccount(uint256 accountSeed) internal returns (address account) {
         if (accounts.length() == 0) account = _createAccount(accountSeed);
         else account = _indexToAccount(accountSeed);
+    }
+
+    function _createOrGetAdmin(uint256 adminSeed) internal returns (address admin) {
+        admin = _createOrGetAccount(adminSeed);
+        if (!sbt.getIsAdmin(admin)) _setAdmin(admin, true);
     }
 
     // @review - should this be renamed to _seedToAccount?
