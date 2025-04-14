@@ -15,3 +15,5 @@ docs/
 
 report.md
 .vscode
+.notes.md
+.certora_internal/

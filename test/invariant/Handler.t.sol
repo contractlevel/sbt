@@ -502,4 +502,7 @@ contract Handler is Test {
         vm.stopPrank();
         vm.startPrank(newPrank);
     }
+
+    /// @notice empty test to ignore file in coverage report
+    function test_handler() public {}
 }

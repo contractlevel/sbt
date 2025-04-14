@@ -47,8 +47,6 @@ contract Invariant is StdInvariant, BaseTest {
         targetContract(address(handler));
     }
 
-    // @review make this file BaseInvariant and inherit it?
-
     /*//////////////////////////////////////////////////////////////
                                INVARIANTS
     //////////////////////////////////////////////////////////////*/
@@ -79,5 +77,17 @@ contract Invariant is StdInvariant, BaseTest {
             handler.g_totalMinted() - handler.g_totalBurned(),
             "Invariant violated: Total supply should be total minted minus total burned."
         );
+    }
+
+    // No approvals should exist:
+    // loop through all tokens and assert that the token has no approved address
+    function invariant_noApprovals() public view {
+        uint256 totalSupply = sbt.totalSupply();
+        for (uint256 i = 0; i < totalSupply; i++) {
+            uint256 tokenId = sbt.tokenByIndex(i);
+            assertEq(
+                sbt.getApproved(tokenId), address(0), "Invariant violated: Token should not have an approved address."
+            );
+        }
     }
 }

@@ -12,7 +12,7 @@ import {ISoulBoundToken} from "./interfaces/ISoulBoundToken.sol";
 
 /// @title SoulBoundToken
 /// @author @contractlevel
-/// @dev ERC721 token with whitelist, blacklist, and non-transferrable functionality
+/// @notice Non-transferrable ERC721 token with administrative whitelist and blacklist functionality
 contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
@@ -388,21 +388,6 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /*//////////////////////////////////////////////////////////////
                                 OVERRIDE
     //////////////////////////////////////////////////////////////*/
-    /// @dev Override to make tokens non-transferrable
-    /// @dev If this tx is a mint, allow it (from == address(0))
-    /// @dev If this tx is a burn, allow it (from == 0 && to == 0)
-    /// Otherwise, block all transfers
-    function _update(address to, uint256 tokenId, address auth) internal override returns (address) {
-        address from = _ownerOf(tokenId);
-
-        /// @dev Allow mints (from == 0) and allow burns (from == 0 && to == 0)
-        if (from != address(0) && (from != address(0) && to != address(0))) {
-            revert SoulBoundToken__TransferNotAllowed();
-        }
-
-        return super._update(to, tokenId, auth);
-    }
-
     /// @dev Returns the base URI for token metadata
     /// @return string The base URI
     function _baseURI() internal view override returns (string memory) {
@@ -417,5 +402,10 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @dev Override to prevent approval for non-transferrable tokens
     function setApprovalForAll(address, /* operator */ bool /* approved */ ) public pure override(ERC721, IERC721) {
         revert SoulBoundToken__ApprovalNotAllowed();
+    }
+
+    /// @dev Override to prevent transfers
+    function transferFrom(address, address, uint256) public pure override(ERC721, IERC721) {
+        revert SoulBoundToken__TransferNotAllowed();
     }
 }
