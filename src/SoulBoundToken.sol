@@ -130,6 +130,8 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @dev This will revert if any of the accounts are blacklisted or already whitelisted to save gas on SLOADs
     /// @notice This function is only callable by the contract admins
     function batchAddToWhitelist(address[] calldata accounts) external onlyAdmin {
+        // @review - revert if accounts.length == 0
+        // do the same for other batch functions
         for (uint256 i = 0; i < accounts.length; ++i) {
             _addToWhitelist(accounts[i]);
         }
