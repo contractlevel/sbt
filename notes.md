@@ -1,6 +1,0 @@
-       "lib/openzeppelin-contracts/contracts/token/ERC721/ERC721.sol",
-       "lib/openzeppelin-contracts/contracts/token/ERC721/extensions/ERC721Enumerable.sol",
-       "lib/openzeppelin-contracts/contracts/token/ERC721/extensions/ERC721URIStorage.sol",
-       "lib/openzeppelin-contracts/contracts/access/Ownable.sol",
-       "lib/openzeppelin-contracts/contracts/utils/Strings.sol",
-       "lib/openzeppelin-contracts/contracts/utils/Context.sol",
