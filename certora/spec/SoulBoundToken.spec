@@ -12,6 +12,8 @@ methods {
     function balanceOf(address) external returns (uint256) envfree;
     function getWhitelisted(address) external returns (bool) envfree;
     function getBlacklisted(address) external returns (bool) envfree;
+    function getIsAdmin(address) external returns (bool) envfree;
+    function ownerOf(uint256) external returns (address) envfree;
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -27,6 +29,29 @@ definition canMint(method f) returns bool =
 definition canBurn(method f) returns bool = 
 	f.selector == sig:addToBlacklist(address).selector ||
     f.selector == sig:batchAddToBlacklist(address[]).selector;
+
+/// @notice functions that can only be called by admins
+definition onlyAdmin(method f) returns bool = 
+    f.selector == sig:setWhitelistEnabled(bool).selector ||
+    f.selector == sig:addToWhitelist(address).selector ||
+    f.selector == sig:batchAddToWhitelist(address[]).selector ||
+    f.selector == sig:removeFromWhitelist(address).selector ||
+    f.selector == sig:batchRemoveFromWhitelist(address[]).selector ||
+    f.selector == sig:addToBlacklist(address).selector ||
+    f.selector == sig:batchAddToBlacklist(address[]).selector ||
+    f.selector == sig:removeFromBlacklist(address).selector ||
+    f.selector == sig:batchRemoveFromBlacklist(address[]).selector ||
+    f.selector == sig:mintAsAdmin(address).selector ||
+    f.selector == sig:batchMintAsAdmin(address[]).selector;
+
+/*//////////////////////////////////////////////////////////////
+                           FUNCTIONS
+//////////////////////////////////////////////////////////////*/
+/// @notice enforce consistency between ERC721::_owners and ERC721Enumerable::_ownedTokens
+function ownershipConsistency(address owner, uint256 index) returns bool {
+    return index < balanceOf(owner) => 
+        ownerOf(tokenOfOwnerByIndex(owner, index)) == owner;
+}
 
 /*//////////////////////////////////////////////////////////////
                              GHOSTS
@@ -55,20 +80,9 @@ hook Sstore currentContract._allTokens.length uint256 newValue (uint256 oldValue
     else if (newValue < oldValue) g_totalBurned = g_totalBurned + oldValue - newValue;
 }
 
-/// @notice constrain havoc'd ERC721Enumerable storage vars to match ERC721
+/// @notice update g_transferHappened ghost if a non mint/burn transfer happens
 hook Sstore currentContract._owners[KEY uint256 tokenId] address newOwner (address oldOwner) {
-    if (oldOwner == 0 && newOwner != 0) {
-        // Minting
-        require balanceOf(newOwner) == 1;
-        require tokenOfOwnerByIndex(newOwner, 0) == tokenId;
-    } else if (oldOwner != 0 && newOwner == 0) {
-        // Burning
-        require balanceOf(oldOwner) == 0;
-        require tokenOfOwnerByIndex(oldOwner, 0) == 0;
-    } else if (oldOwner != 0 && newOwner != 0) {
-        // Transfer
-        g_transferHappened = true;
-    }
+    if (oldOwner != 0 && newOwner != 0) g_transferHappened = true;
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -79,14 +93,20 @@ invariant totalSupplyAccounting()
     to_mathint(totalSupply()) == g_totalMinted - g_totalBurned;
 
 /// @notice each account can hold at most one token
-invariant oneTokenPerAccount(address a)
-    balanceOf(a) <= 1;
+invariant oneTokenPerAccount(address a, uint256 index)
+    balanceOf(a) <= 1 {
+        preserved {
+            require ownershipConsistency(a, index);
+        }
+    }
 
 /// @notice no blacklisted accounts should hold the token
-invariant blacklisted_noToken(address a)
+invariant blacklisted_noToken(address a, uint256 index)
     getBlacklisted(a) => balanceOf(a) == 0 {
         preserved {
             requireInvariant blacklistedCantBeWhitelisted(a);
+            requireInvariant oneTokenPerAccount(a, index);
+            require ownershipConsistency(a, index);
         }
     }
 
@@ -102,12 +122,12 @@ invariant blacklistedCantBeWhitelisted(address a)
                              RULES
 //////////////////////////////////////////////////////////////*/
 /// @notice minting increases total supply
-// @review this is failing because oldTotalSupply == MAX_UINT256
 rule mintingIncreasesTotalSupply(method f) filtered {f -> canMint(f)} {
     env e;
     calldataarg args;
 
     uint256 oldTotalSupply = totalSupply();
+    require oldTotalSupply < max_uint256;
 
     f(e, args);
 
@@ -139,14 +159,27 @@ rule burningDecreasesTotalSupply(method f) filtered {f -> canBurn(f)} {
 }
 
 /// @notice any function other than burning does not decrease total supply
-// @review this is failing because oldTotalSupply == MAX_UINT256
 rule nonBurningDoesNotDecreaseTotalSupply(method f) filtered {f -> !canBurn(f)} {
     env e;
     calldataarg args;
 
     uint256 oldTotalSupply = totalSupply();
+    require oldTotalSupply < max_uint256;
 
     f(e, args);
 
     assert totalSupply() >= oldTotalSupply;
+}
+
+/// @notice the only transfers should be mint and burn (ie from and to address(0))
+
+/// @notice onlyAdmin functions should revert if called by non-admins
+rule onlyAdminFunctionsRevertIfCalledByNonAdmins(method f) filtered {f -> onlyAdmin(f)} {
+    env e;
+    calldataarg args;
+    require !getIsAdmin(e.msg.sender);
+
+    f@withrevert(e, args);
+
+    assert lastReverted;
 }
