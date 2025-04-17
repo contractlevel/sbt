@@ -29,6 +29,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     error SoulBoundToken__ApprovalNotAllowed();
     error SoulBoundToken__AdminStatusAlreadySet(address account, bool isAdmin);
     error SoulBoundToken__AlreadyMinted(address account);
+    error SoulBoundToken__EmptyArray();
 
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
@@ -97,10 +98,12 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @dev Mints a new token to the specified addresses
     /// @param accounts Addresses to mint the tokens to
     /// @return uint256[] The IDs of the minted tokens
+    /// @dev Revert if accounts array is empty
     /// @dev Revert if any of the accounts are not whitelisted when whitelist is enabled
     /// @dev Revert if any of the accounts are blacklisted
     /// @notice This function is only callable by the contract admins
     function batchMintAsAdmin(address[] calldata accounts) external onlyAdmin returns (uint256[] memory) {
+        _revertIfEmptyArray(accounts);
         uint256[] memory tokenIds = new uint256[](accounts.length);
         for (uint256 i = 0; i < accounts.length; ++i) {
             tokenIds[i] = _mintAsAdmin(accounts[i]);
@@ -128,10 +131,10 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @dev Adds multiple addresses to the whitelist
     /// @param accounts Addresses to add to the whitelist
     /// @dev This will revert if any of the accounts are blacklisted or already whitelisted to save gas on SLOADs
+    /// @dev Revert if accounts array is empty
     /// @notice This function is only callable by the contract admins
     function batchAddToWhitelist(address[] calldata accounts) external onlyAdmin {
-        // @review - revert if accounts.length == 0
-        // do the same for other batch functions
+        _revertIfEmptyArray(accounts);
         for (uint256 i = 0; i < accounts.length; ++i) {
             _addToWhitelist(accounts[i]);
         }
@@ -147,8 +150,10 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @dev Removes multiple addresses from the whitelist
     /// @param accounts Addresses to remove from the whitelist
     /// @dev This will revert if any of the addresses are not already whitelisted
+    /// @dev Revert if accounts array is empty
     /// @notice This function is only callable by the contract admins
     function batchRemoveFromWhitelist(address[] calldata accounts) external onlyAdmin {
+        _revertIfEmptyArray(accounts);
         for (uint256 i = 0; i < accounts.length; ++i) {
             _removeFromWhitelist(accounts[i]);
         }
@@ -164,8 +169,10 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @dev Adds multiple addresses to the blacklist
     /// @param accounts Addresses to add to the blacklist
     /// @dev This will revert if any of the accounts are already blacklisted to save gas on SLOADs
+    /// @dev Revert if accounts array is empty
     /// @notice This function is only callable by the contract admins
     function batchAddToBlacklist(address[] calldata accounts) external onlyAdmin {
+        _revertIfEmptyArray(accounts);
         for (uint256 i = 0; i < accounts.length; ++i) {
             _addToBlacklist(accounts[i]);
         }
@@ -181,8 +188,10 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @dev Removes multiple addresses from the blacklist
     /// @param accounts Addresses to remove from the blacklist
     /// @dev This will revert if any of the accounts are not already blacklisted to save gas on SLOADs
+    /// @dev Revert if accounts array is empty
     /// @notice This function is only callable by the contract admins
     function batchRemoveFromBlacklist(address[] calldata accounts) external onlyAdmin {
+        _revertIfEmptyArray(accounts);
         for (uint256 i = 0; i < accounts.length; ++i) {
             _removeFromBlacklist(accounts[i]);
         }
@@ -202,8 +211,10 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @param accounts The addresses to set the admin status for
     /// @param isAdmin The admin status to set
     /// @dev Revert if the admin status is already set
+    /// @dev Revert if accounts array is empty
     /// @notice Only the owner can set the admin status
     function batchSetAdmin(address[] calldata accounts, bool isAdmin) external onlyOwner {
+        _revertIfEmptyArray(accounts);
         for (uint256 i = 0; i < accounts.length; ++i) {
             if (s_admins[accounts[i]] == isAdmin) revert SoulBoundToken__AdminStatusAlreadySet(accounts[i], isAdmin);
             s_admins[accounts[i]] = isAdmin;
@@ -308,6 +319,11 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @dev Revert if account is not whitelisted
     function _revertIfNotWhitelisted(address account) internal view {
         if (!s_whitelist[account]) revert SoulBoundToken__NotWhitelisted(account);
+    }
+
+    /// @dev Revert if empty array
+    function _revertIfEmptyArray(address[] calldata accounts) internal pure {
+        if (accounts.length == 0) revert SoulBoundToken__EmptyArray();
     }
 
     /// @dev Enable whitelist

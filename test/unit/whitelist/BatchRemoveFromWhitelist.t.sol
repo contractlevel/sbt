@@ -19,6 +19,11 @@ contract BatchRemoveFromWhitelistTest is BaseTest {
         sbt.batchRemoveFromWhitelist(accounts);
     }
 
+    function test_sbt_batchRemoveFromWhitelist_revertsWhen_emptyArray() public {
+        vm.expectRevert(abi.encodeWithSignature("SoulBoundToken__EmptyArray()"));
+        sbt.batchRemoveFromWhitelist(new address[](0));
+    }
+
     function test_sbt_batchRemoveFromWhitelist_success() public {
         accounts = new address[](2);
         accounts[0] = user;

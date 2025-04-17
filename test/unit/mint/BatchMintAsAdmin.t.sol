@@ -35,6 +35,11 @@ contract BatchMintAsAdminTest is BaseTest {
         sbt.batchMintAsAdmin(accounts);
     }
 
+    function test_sbt_batchMintAsAdmin_revertsWhen_emptyArray() public {
+        vm.expectRevert(abi.encodeWithSignature("SoulBoundToken__EmptyArray()"));
+        sbt.batchMintAsAdmin(new address[](0));
+    }
+
     function test_sbt_batchMintAsAdmin_success() public {
         address[] memory accounts = new address[](1);
         accounts[0] = whitelisted;

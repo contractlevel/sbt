@@ -33,6 +33,11 @@ contract BatchAddToWhiteListTest is BaseTest {
         sbt.batchAddToWhitelist(accounts);
     }
 
+    function test_sbt_batchAddToWhitelist_revertsWhen_emptyArray() public {
+        vm.expectRevert(abi.encodeWithSignature("SoulBoundToken__EmptyArray()"));
+        sbt.batchAddToWhitelist(new address[](0));
+    }
+
     function test_sbt_batchAddToWhitelist_success() public {
         accounts = new address[](2);
         accounts[0] = user;

@@ -74,6 +74,11 @@ contract BatchAddToBlacklistTest is BaseTest {
         assertTrue(sbt.getBlacklisted(user2));
     }
 
+    function test_sbt_batchAddToBlacklist_revertsWhen_emptyArray() public {
+        vm.expectRevert(abi.encodeWithSignature("SoulBoundToken__EmptyArray()"));
+        sbt.batchAddToBlacklist(new address[](0));
+    }
+
     function test_sbt_batchAddToBlacklist_burnsTokens() public {
         _whitelist(user);
         sbt.mintAsAdmin(user);

@@ -21,6 +21,12 @@ contract BatchSetAdminTest is BaseTest {
         sbt.batchSetAdmin(accounts, true);
     }
 
+    function test_sbt_batchSetAdmin_revertsWhen_emptyArray() public {
+        _changePrank(owner);
+        vm.expectRevert(abi.encodeWithSignature("SoulBoundToken__EmptyArray()"));
+        sbt.batchSetAdmin(new address[](0), true);
+    }
+
     function test_sbt_batchSetAdmin_success() public {
         accounts = new address[](1);
         accounts[0] = user;
