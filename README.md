@@ -24,7 +24,7 @@ There are 4 key roles in this system:
 
 ### Whitelisted
 
-- can mint a token if whitelist is enabled
+- can mint themself a token if whitelist is enabled
 
 ### Blacklisted
 
