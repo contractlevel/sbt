@@ -56,6 +56,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     event RemovedFromBlacklist(address indexed account);
     event UpdatedWhitelistEnabled(bool indexed isWhitelistEnabled);
     event UpdatedBaseURI(string newBaseURI);
+    event AdminStatusSet(address indexed account, bool indexed isAdmin);
 
     /*//////////////////////////////////////////////////////////////
                                MODIFIERS
@@ -104,9 +105,14 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @notice This function is only callable by the contract admins
     function batchMintAsAdmin(address[] calldata accounts) external onlyAdmin returns (uint256[] memory) {
         _revertIfEmptyArray(accounts);
+        uint256 startId = _incrementTokenIdCounter(accounts.length);
+
         uint256[] memory tokenIds = new uint256[](accounts.length);
         for (uint256 i = 0; i < accounts.length; ++i) {
-            tokenIds[i] = _mintAsAdmin(accounts[i]);
+            _mintAsAdminChecks(accounts[i]);
+            // tokenIds[i] = _mintAsAdmin(accounts[i]);
+            tokenIds[i] = startId + i;
+            _safeMint(accounts[i], tokenIds[i]);
         }
         return tokenIds;
     }
@@ -118,6 +124,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     function mintAsWhitelisted() external returns (uint256) {
         if (!_isWhitelistEnabled()) revert SoulBoundToken__WhitelistDisabled();
         _revertIfNotWhitelisted(msg.sender);
+        _revertIfAlreadyMinted(msg.sender);
         return _mintSoulBoundToken(msg.sender);
     }
 
@@ -205,6 +212,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     function setAdmin(address account, bool isAdmin) external onlyOwner {
         if (s_admins[account] == isAdmin) revert SoulBoundToken__AdminStatusAlreadySet(account, isAdmin);
         s_admins[account] = isAdmin;
+        emit AdminStatusSet(account, isAdmin);
     }
 
     /// @dev Sets the admin status for multiple addresses
@@ -226,16 +234,26 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     //////////////////////////////////////////////////////////////*/
     /// @dev Mints a new token to the specified address
     /// @param account Address to mint the token to
-    /// @return uint256 The ID of the minted token
-    function _mintSoulBoundToken(address account) internal returns (uint256) {
-        if (balanceOf(account) > 0) revert SoulBoundToken__AlreadyMinted(account);
-
-        // @review - can looping through this be optimized?
-        // https://github.com/crytic/slither/wiki/Detector-Documentation#costly-operations-inside-a-loop
-        uint256 tokenId = s_tokenIdCounter;
-        s_tokenIdCounter++;
+    /// @return tokenId The ID of the minted token
+    function _mintSoulBoundToken(address account) internal returns (uint256 tokenId) {
+        tokenId = _incrementTokenIdCounter(1); //
         _safeMint(account, tokenId);
         return tokenId;
+    }
+
+    function _incrementTokenIdCounter(uint256 count) internal returns (uint256 startId) {
+        startId = s_tokenIdCounter;
+        s_tokenIdCounter += count;
+        return startId;
+    }
+
+    /// @param account Address to check
+    /// @dev Revert if account is not whitelisted when whitelist is enabled
+    /// @dev Revert if account is blacklisted
+    function _mintAsAdminChecks(address account) internal view {
+        _revertIfAlreadyMinted(account);
+        if (_isWhitelistEnabled()) _revertIfNotWhitelisted(account);
+        _revertIfBlacklisted(account);
     }
 
     /// @dev Mints a new token to the specified address
@@ -244,8 +262,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @dev Revert if account is not whitelisted when whitelist is enabled
     /// @dev Revert if account is blacklisted
     function _mintAsAdmin(address account) internal returns (uint256) {
-        if (_isWhitelistEnabled()) _revertIfNotWhitelisted(account);
-        _revertIfBlacklisted(account);
+        _mintAsAdminChecks(account);
         return _mintSoulBoundToken(account);
     }
 
@@ -324,6 +341,11 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @dev Revert if empty array
     function _revertIfEmptyArray(address[] calldata accounts) internal pure {
         if (accounts.length == 0) revert SoulBoundToken__EmptyArray();
+    }
+
+    /// @dev Revert if already minted
+    function _revertIfAlreadyMinted(address account) internal view {
+        if (balanceOf(account) > 0) revert SoulBoundToken__AlreadyMinted(account);
     }
 
     /// @dev Enable whitelist
