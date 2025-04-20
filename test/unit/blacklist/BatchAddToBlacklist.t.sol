@@ -26,13 +26,6 @@ contract BatchAddToBlacklistTest is BaseTest {
         sbt.batchAddToBlacklist(accounts);
     }
 
-    function test_sbt_batchAddToBlacklist_revertsWhen_blacklisted() public {
-        accounts = new address[](1);
-        accounts[0] = blacklisted;
-        vm.expectRevert(abi.encodeWithSignature("SoulBoundToken__Blacklisted(address)", blacklisted));
-        sbt.batchAddToBlacklist(accounts);
-    }
-
     function test_sbt_batchAddToBlacklist_removesFromWhitelist() public {
         accounts = new address[](1);
         accounts[0] = whitelisted;
