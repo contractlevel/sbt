@@ -49,4 +49,23 @@ contract BatchMintAsAdminTest is BaseTest {
         assertEq(tokenIds[0], tokenId);
         assertEq(sbt.ownerOf(tokenId), whitelisted);
     }
+
+    function test_sbt_batchMintAsAdmin_success_multiple() public {
+        address[] memory accounts = new address[](2);
+        accounts[0] = whitelisted;
+        accounts[1] = user;
+        sbt.addToWhitelist(user);
+
+        uint256 startId = sbt.getTokenIdCounter();
+
+        uint256[] memory tokenIds = sbt.batchMintAsAdmin(accounts);
+
+        uint256 endId = sbt.getTokenIdCounter();
+
+        assertEq(tokenIds.length, accounts.length);
+        assertEq(tokenIds[0], startId);
+        assertEq(sbt.ownerOf(tokenIds[0]), whitelisted);
+        assertEq(sbt.ownerOf(tokenIds[1]), user);
+        assertEq(endId, startId + 2); // startId = whitelisted, +1 = user, +2 = next ID
+    }
 }

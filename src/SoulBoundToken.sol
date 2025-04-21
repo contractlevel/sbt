@@ -91,6 +91,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @return uint256 The ID of the minted token
     /// @dev Revert if account is not whitelisted when whitelist is enabled
     /// @dev Revert if account is blacklisted
+    /// @dev Revert if account already minted a token
     /// @notice This function is only callable by the contract admins
     function mintAsAdmin(address account) external onlyAdmin returns (uint256) {
         return _mintAsAdmin(account);
@@ -102,6 +103,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @dev Revert if accounts array is empty
     /// @dev Revert if any of the accounts are not whitelisted when whitelist is enabled
     /// @dev Revert if any of the accounts are blacklisted
+    /// @dev Revert if any of the accounts have already been minted a token
     /// @notice This function is only callable by the contract admins
     function batchMintAsAdmin(address[] calldata accounts) external onlyAdmin returns (uint256[] memory) {
         _revertIfEmptyArray(accounts);
@@ -110,7 +112,6 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
         uint256[] memory tokenIds = new uint256[](accounts.length);
         for (uint256 i = 0; i < accounts.length; ++i) {
             _mintAsAdminChecks(accounts[i]);
-            // tokenIds[i] = _mintAsAdmin(accounts[i]);
             tokenIds[i] = startId + i;
             _safeMint(accounts[i], tokenIds[i]);
         }
@@ -121,6 +122,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @return uint256 The ID of the minted token
     /// @dev Revert if whitelist is disabled
     /// @dev Revert if msg.sender is not whitelisted
+    /// @dev Revert if msg.sender already minted a token
     function mintAsWhitelisted() external returns (uint256) {
         if (!_isWhitelistEnabled()) revert SoulBoundToken__WhitelistDisabled();
         _revertIfNotWhitelisted(msg.sender);
@@ -131,6 +133,9 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @dev Adds an address to the whitelist
     /// @param account Address to add to the whitelist
     /// @notice This function is only callable by the contract admins
+    /// @dev Revert if account == zero address
+    /// @dev Revert if account already whitelisted
+    /// @dev Revert if account blacklisted
     function addToWhitelist(address account) external onlyAdmin {
         _addToWhitelist(account);
     }
@@ -139,6 +144,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @param accounts Addresses to add to the whitelist
     /// @dev This will revert if any of the accounts are blacklisted or already whitelisted to save gas on SLOADs
     /// @dev Revert if accounts array is empty
+    /// @dev Revert if any account == zero address
     /// @notice This function is only callable by the contract admins
     function batchAddToWhitelist(address[] calldata accounts) external onlyAdmin {
         _revertIfEmptyArray(accounts);
@@ -241,6 +247,10 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
         return tokenId;
     }
 
+    /// @dev Increments the tokenID counter
+    /// @param count Amount to increment s_tokenIdCounter by
+    /// @return startId The tokenId before incrementing
+    /// @notice This function is to optimize storage read and writes when batch minting
     function _incrementTokenIdCounter(uint256 count) internal returns (uint256 startId) {
         startId = s_tokenIdCounter;
         s_tokenIdCounter += count;
