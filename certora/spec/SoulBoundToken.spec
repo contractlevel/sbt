@@ -88,6 +88,26 @@ persistent ghost bool g_transferHappened {
     init_state axiom g_transferHappened == false;
 }
 
+/// @notice Track admin status for addresses
+persistent ghost mapping(address => bool) g_admins {
+    init_state axiom forall address a. g_admins[a] == false;
+}
+
+/// @notice Track whitelist status for addresses
+persistent ghost mapping(address => bool) g_whitelisted {
+    init_state axiom forall address a. g_whitelisted[a] == false;
+}
+
+/// @notice Track blacklist status for addresses
+persistent ghost mapping(address => bool) g_blacklisted {
+    init_state axiom forall address a. g_blacklisted[a] == false;
+}
+
+/// @notice track SBT token balance per account
+persistent ghost mapping(address => uint256) g_balances {
+    init_state axiom forall address a. g_balances[a] == 0;
+}
+
 /*//////////////////////////////////////////////////////////////
                              HOOKS
 //////////////////////////////////////////////////////////////*/
@@ -98,8 +118,29 @@ hook Sstore currentContract._allTokens.length uint256 newValue (uint256 oldValue
 }
 
 /// @notice update g_transferHappened ghost if a non mint/burn transfer happens
+/// @notice the only transfers should be mint and burn (ie from and to address(0))
 hook Sstore currentContract._owners[KEY uint256 tokenId] address newOwner (address oldOwner) {
     if (oldOwner != 0 && newOwner != 0) g_transferHappened = true;
+}
+
+/// @notice update g_balances ghost for an account when storage changes
+hook Sstore currentContract._balances[KEY address account] uint256 newBalance (uint256 oldBalance) {
+    g_balances[account] = newBalance;
+}
+
+/// @notice Update g_admins when s_admins is modified
+hook Sstore currentContract.s_admins[KEY address a] bool newStatus (bool oldStatus) {
+    g_admins[a] = newStatus;
+}
+
+/// @notice Update g_whitelisted when s_whitelist is modified
+hook Sstore currentContract.s_whitelist[KEY address a] bool newStatus (bool oldStatus) {
+    g_whitelisted[a] = newStatus;
+}
+
+/// @notice Update g_blacklisted when s_blacklist is modified
+hook Sstore currentContract.s_blacklist[KEY address a] bool newStatus (bool oldStatus) {
+    g_blacklisted[a] = newStatus;
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -187,8 +228,6 @@ rule nonBurningDoesNotDecreaseTotalSupply(method f) filtered {f -> !canBurn(f)} 
 
     assert totalSupply() >= oldTotalSupply;
 }
-
-/// @notice the only transfers should be mint and burn (ie from and to address(0))
 
 /// @notice onlyAdmin functions should revert if called by non-admins
 rule onlyAdmin_revertsWhen_nonAdmin(method f) filtered {f -> onlyAdmin(f)} {
@@ -323,9 +362,10 @@ rule batchAddToWhitelist_revertsWhen_emptyArray() {
 rule batchAddToWhitelist_success() {
     env e;
     address[] a;
-    require getIsAdmin(e.msg.sender);
+    
     batchAddToWhitelist(e, a);
-    assert getWhitelisted(a[0]);
+
+    assert forall uint256 i. i < a.length => g_whitelisted[a[i]];
 }
 
 // --- batchRemoveFromWhitelist --- //
@@ -351,7 +391,8 @@ rule batchRemoveFromWhitelist_success() {
     env e;
     address[] a;
     batchRemoveFromWhitelist(e, a);
-    assert !getWhitelisted(a[0]);
+
+    assert forall uint256 i. i < a.length => !g_whitelisted[a[i]];
 }
 
 // --- removeFromWhitelist --- //
@@ -374,7 +415,6 @@ rule removeFromWhitelist_success() {
 /*//////////////////////////////////////////////////////////////
                            BLACKLIST
 //////////////////////////////////////////////////////////////*/
-
 // --- addToBlacklist --- //
 rule addToBlacklist_revertsWhen_zeroAddress() {
     env e;
@@ -396,11 +436,10 @@ rule addToBlacklist_revertsWhen_alreadyBlacklisted() {
 rule addToBlacklist_success() {
     env e;
     address a;
+    uint256 index;
 
-    require getIsAdmin(e.msg.sender);
-    require getWhitelisted(a);
-    require balanceOf(a) == 1;
-    require ownershipConsistency(a, 0);
+    requireInvariant oneTokenPerAccount(a, index);
+    require ownershipConsistency(a, index);
 
     addToBlacklist(e, a);
 
@@ -426,4 +465,133 @@ rule batchAddToBlacklist_revertsWhen_alreadyBlacklisted() {
     require getIsAdmin(e.msg.sender);
     batchAddToBlacklist@withrevert(e, a);
     assert lastReverted;
+}
+
+rule batchAddToBlacklist_revertsWhen_emptyArray() {
+    env e;
+    address[] a;
+    require a.length == 0;
+    require getIsAdmin(e.msg.sender);
+    batchAddToBlacklist@withrevert(e, a);
+    assert lastReverted;
+}
+
+rule batchAddToBlacklist_success() {
+    env e;
+    address[] a;
+    uint256 index;
+
+    require a.length == 3
+        &&  ownershipConsistency(a[0], index)
+        &&  ownershipConsistency(a[1], index)
+        &&  ownershipConsistency(a[2], index);
+    requireInvariant oneTokenPerAccount(a[0], index);
+    requireInvariant oneTokenPerAccount(a[1], index);
+    requireInvariant oneTokenPerAccount(a[2], index);
+
+    batchAddToBlacklist(e, a);
+
+    assert  balanceOf(a[0]) == 0 && getBlacklisted(a[0]) && !getWhitelisted(a[0]) 
+        &&  balanceOf(a[1]) == 0 && getBlacklisted(a[1]) && !getWhitelisted(a[1]) 
+        &&  balanceOf(a[2]) == 0 && getBlacklisted(a[2]) && !getWhitelisted(a[2]);
+}
+
+// --- removeFromBlacklist --- //
+rule removeFromBlacklist_revertsWhen_notBlacklisted() {
+    env e;
+    address a;
+    require !getBlacklisted(a);
+    removeFromBlacklist@withrevert(e, a);
+    assert lastReverted;
+}
+
+rule removeFromBlacklist_success() {
+    env e;
+    address a;
+    require getBlacklisted(a);
+    removeFromBlacklist(e, a);
+    assert !getBlacklisted(a);
+}
+
+// --- batchRemoveFromBlacklist --- //
+rule batchRemoveFromBlacklist_revertsWhen_notBlacklisted() {
+    env e;
+    address[] a;
+    require !getBlacklisted(a[0]);
+    require getIsAdmin(e.msg.sender);
+    batchRemoveFromBlacklist@withrevert(e, a);
+    assert lastReverted;
+}
+
+rule batchRemoveFromBlacklist_revertsWhen_emptyArray() {
+    env e;
+    address[] a;
+    require a.length == 0;
+    require getIsAdmin(e.msg.sender);
+    batchRemoveFromBlacklist@withrevert(e, a);
+    assert lastReverted;
+}
+
+rule batchRemoveFromBlacklist_success() {
+    env e;
+    address[] a;
+
+    batchRemoveFromBlacklist(e, a);
+
+    assert forall uint256 i. i < a.length => !g_blacklisted[a[i]];
+}
+
+/*//////////////////////////////////////////////////////////////
+                              MINT
+//////////////////////////////////////////////////////////////*/
+
+// --- batchMintAsAdmin --- //
+rule batchMintAsAdmin_revertsWhen_notWhitelisted_ifWhitelistEnabled() {
+    env e;
+    address[] a;
+    require getIsAdmin(e.msg.sender);
+    require getWhitelistEnabled();
+    require !getWhitelisted(a[0]);
+    batchMintAsAdmin@withrevert(e, a);
+    assert lastReverted;
+}
+
+rule batchMintAsAdmin_revertsWhen_blacklisted() {
+    env e;
+    address[] a;
+    require getBlacklisted(a[0]);
+    require getIsAdmin(e.msg.sender);
+    require !getWhitelistEnabled();
+    batchMintAsAdmin@withrevert(e, a);
+    assert lastReverted;
+}
+
+rule batchMintAsAdmin_revertsWhen_alreadyMinted() {
+    env e;
+    address[] a;
+    require balanceOf(a[0]) == 1;
+    require getIsAdmin(e.msg.sender);
+    require !getWhitelistEnabled();
+    batchMintAsAdmin@withrevert(e, a);
+    assert lastReverted;
+}
+
+rule batchMintAsAdmin_revertsWhen_emptyArray() {
+    env e;
+    address[] a;
+    require a.length == 0;
+    require getIsAdmin(e.msg.sender);
+    require !getWhitelistEnabled();
+    batchMintAsAdmin@withrevert(e, a);
+    assert lastReverted;
+}
+
+rule batchMintAsAdmin_success() {
+    env e;
+    address[] a;
+    require getIsAdmin(e.msg.sender);
+    require !getWhitelistEnabled();
+    require balanceOf(a[0]) == 0;
+    batchMintAsAdmin(e, a);
+    assert balanceOf(a[0]) == 1;
 }

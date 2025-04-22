@@ -216,9 +216,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @dev Revert if the admin status is already set
     /// @notice Only the owner can set the admin status
     function setAdmin(address account, bool isAdmin) external onlyOwner {
-        if (s_admins[account] == isAdmin) revert SoulBoundToken__AdminStatusAlreadySet(account, isAdmin);
-        s_admins[account] = isAdmin;
-        emit AdminStatusSet(account, isAdmin);
+        _setAdmin(account, isAdmin);
     }
 
     /// @dev Sets the admin status for multiple addresses
@@ -230,8 +228,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     function batchSetAdmin(address[] calldata accounts, bool isAdmin) external onlyOwner {
         _revertIfEmptyArray(accounts);
         for (uint256 i = 0; i < accounts.length; ++i) {
-            if (s_admins[accounts[i]] == isAdmin) revert SoulBoundToken__AdminStatusAlreadySet(accounts[i], isAdmin);
-            s_admins[accounts[i]] = isAdmin;
+            _setAdmin(accounts[i], isAdmin);
         }
     }
 
@@ -378,6 +375,12 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @return bool Whether the whitelist is enabled
     function _isWhitelistEnabled() internal view returns (bool) {
         return s_whitelistEnabled;
+    }
+
+    function _setAdmin(address account, bool isAdmin) internal {
+        if (s_admins[account] == isAdmin) revert SoulBoundToken__AdminStatusAlreadySet(account, isAdmin);
+        s_admins[account] = isAdmin;
+        emit AdminStatusSet(account, isAdmin);
     }
 
     /*//////////////////////////////////////////////////////////////
