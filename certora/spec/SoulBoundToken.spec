@@ -85,11 +85,7 @@ definition RemovedFromBlacklistEvent() returns bytes32 =
 definition UpdatedWhitelistEnabledEvent() returns bytes32 =
 // keccak256(abi.encodePacked("UpdatedWhitelistEnabled(bool)"))
     to_bytes32(0xa5cd35b7d08099e2e1b6ac2519d634bccdaa9f147976786a54580f0d354e342f);
-
-// definition UpdatedBaseURIEvent() returns bytes32 =
-// // keccak256(abi.encodePacked("UpdatedBaseURI(string)"))
-//     to_bytes32(0xe12d4d4a70d9b5c313db41dbfde977d2932dd59c55fca4a4af5181b2397c1725);
-
+    
 definition AdminStatusSetEvent() returns bytes32 =
 // keccak256(abi.encodePacked("AdminStatusSet(address,bool)"))
     to_bytes32(0xa8c4c644eea5bad1029a340b24f332f16eeb8ca98e4cb0ce50df3083fc6d40b4);
@@ -196,16 +192,6 @@ persistent ghost mathint g_whitelistEnabledStorageCount {
     init_state axiom g_whitelistEnabledStorageCount == 0;
 }
 
-// /// @notice track amount UpdatedBaseURI event is emitted
-// persistent ghost mathint g_updatedBaseURIEventCount {
-//     init_state axiom g_updatedBaseURIEventCount == 0;
-// }
-
-// /// @notice track amount s_baseURI is modified
-// persistent ghost mathint g_baseURIStorageCount {
-//     init_state axiom g_baseURIStorageCount == 0;
-// }
-
 /*//////////////////////////////////////////////////////////////
                              HOOKS
 //////////////////////////////////////////////////////////////*/
@@ -249,17 +235,6 @@ hook Sstore currentContract.s_whitelistEnabled bool newStatus (bool oldStatus) {
     g_whitelistEnabled = newStatus;
     g_whitelistEnabledStorageCount = g_whitelistEnabledStorageCount + 1;
 }
-
-// /// @notice increment g_baseURIStorageCount when s_baseURI is modified
-// hook Sstore currentContract.s_baseURI string newBaseURI (string oldBaseURI) {
-//     g_baseURIStorageCount = g_baseURIStorageCount + 1;
-// }
-
-// /// @notice hook onto emitted UpdatedBaseURI event and increment relevant ghost
-// hook LOG1(uint offset, uint length, bytes32 t0) {
-//     if (t0 == UpdatedBaseURIEvent())
-//         g_updatedBaseURIEventCount = g_updatedBaseURIEventCount + 1;
-// }
 
 /// @notice hook onto emitted events and increment relevant ghosts
 hook LOG2(uint offset, uint length, bytes32 t0, bytes32 t1) {
