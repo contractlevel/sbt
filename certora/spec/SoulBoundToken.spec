@@ -85,7 +85,7 @@ definition RemovedFromBlacklistEvent() returns bytes32 =
 definition UpdatedWhitelistEnabledEvent() returns bytes32 =
 // keccak256(abi.encodePacked("UpdatedWhitelistEnabled(bool)"))
     to_bytes32(0xa5cd35b7d08099e2e1b6ac2519d634bccdaa9f147976786a54580f0d354e342f);
-    
+
 definition AdminStatusSetEvent() returns bytes32 =
 // keccak256(abi.encodePacked("AdminStatusSet(address,bool)"))
     to_bytes32(0xa8c4c644eea5bad1029a340b24f332f16eeb8ca98e4cb0ce50df3083fc6d40b4);
@@ -304,10 +304,6 @@ invariant admin_eventConsistency()
 /// @notice total whitelist enabled storage updates should equal total UpdatedWhitelistEnabled events
 invariant whitelistEnabled_eventConsistency()
     g_whitelistEnabledStorageCount == g_updatedWhitelistEnabledEventCount;
-
-// /// @notice total base URI storage updates should equal total UpdatedBaseURI events
-// invariant baseURI_eventConsistency()
-//     g_baseURIStorageCount == g_updatedBaseURIEventCount;
 
 /*//////////////////////////////////////////////////////////////
                              RULES
