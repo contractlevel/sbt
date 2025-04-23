@@ -61,10 +61,43 @@ definition batchFunction(method f) returns bool =
     f.selector == sig:batchMintAsAdmin(address[]).selector ||
     f.selector == sig:batchSetAdmin(address[],bool).selector;
 
+/// @notice functions for approving ERC721
+definition canApprove(method f) returns bool =
+    f.selector == sig:approve(address,uint256).selector ||
+    f.selector == sig:setApprovalForAll(address,bool).selector;
+
+definition AddedToWhitelistEvent() returns bytes32 =
+// keccak256(abi.encodePacked("AddedToWhitelist(address)"))
+    to_bytes32(0xa850ae9193f515cbae8d35e8925bd2be26627fc91bce650b8652ed254e9cab03);
+
+definition RemovedFromWhitelistEvent() returns bytes32 =
+// keccak256(abi.encodePacked("RemovedFromWhitelist(address)"))
+    to_bytes32(0xcdd2e9b91a56913d370075169cefa1602ba36be5301664f752192bb1709df757);
+
+definition AddedToBlacklistEvent() returns bytes32 =
+// keccak256(abi.encodePacked("AddedToBlacklist(address)"))
+    to_bytes32(0xf9b68063b051b82957fa193585681240904fed808db8b30fc5a2d2202c6ed627);
+
+definition RemovedFromBlacklistEvent() returns bytes32 =
+// keccak256(abi.encodePacked("RemovedFromBlacklist(address)"))
+    to_bytes32(0x2b6bf71b58b3583add364b3d9060ebf8019650f65f5be35f5464b9cb3e4ba2d4);
+
+definition UpdatedWhitelistEnabledEvent() returns bytes32 =
+// keccak256(abi.encodePacked("UpdatedWhitelistEnabled(bool)"))
+    to_bytes32(0xa5cd35b7d08099e2e1b6ac2519d634bccdaa9f147976786a54580f0d354e342f);
+
+// definition UpdatedBaseURIEvent() returns bytes32 =
+// // keccak256(abi.encodePacked("UpdatedBaseURI(string)"))
+//     to_bytes32(0xe12d4d4a70d9b5c313db41dbfde977d2932dd59c55fca4a4af5181b2397c1725);
+
+definition AdminStatusSetEvent() returns bytes32 =
+// keccak256(abi.encodePacked("AdminStatusSet(address,bool)"))
+    to_bytes32(0xa8c4c644eea5bad1029a340b24f332f16eeb8ca98e4cb0ce50df3083fc6d40b4);
+
 /*//////////////////////////////////////////////////////////////
                            FUNCTIONS
 //////////////////////////////////////////////////////////////*/
-/// @notice enforce consistency between ERC721::_owners and ERC721Enumerable::_ownedTokens
+/// @notice require this to enforce consistency between ERC721::_owners and ERC721Enumerable::_ownedTokens
 function ownershipConsistency(address owner, uint256 index) returns bool {
     return index < balanceOf(owner) => 
         ownerOf(tokenOfOwnerByIndex(owner, index)) == owner;
@@ -108,6 +141,71 @@ persistent ghost mapping(address => uint256) g_balances {
     init_state axiom forall address a. g_balances[a] == 0;
 }
 
+/// @notice track amount AddedToWhitelist event is emitted
+persistent ghost mathint g_addedToWhitelistEventCount {
+    init_state axiom g_addedToWhitelistEventCount == 0;
+}
+
+/// @notice track amount RemoveFromWhitelist event is emitted
+persistent ghost mathint g_removedFromWhitelistEventCount {
+    init_state axiom g_removedFromWhitelistEventCount == 0;
+}
+
+/// @notice track amount AddedToBlacklist event is emitted
+persistent ghost mathint g_addedToBlacklistEventCount {
+    init_state axiom g_addedToBlacklistEventCount == 0;
+}
+
+/// @notice track amount RemovedFromBlacklist event is emitted
+persistent ghost mathint g_removedFromBlacklistEventCount {
+    init_state axiom g_removedFromBlacklistEventCount == 0;
+}
+
+/// @notice track amount UpdatedWhitelistEnabled event is emitted
+persistent ghost mathint g_updatedWhitelistEnabledEventCount {
+    init_state axiom g_updatedWhitelistEnabledEventCount == 0;
+}
+
+/// @notice track amount AdminStatusSet event is emitted
+persistent ghost mathint g_adminStatusSetEventCount {
+    init_state axiom g_adminStatusSetEventCount == 0;
+}
+
+/// @notice track amount s_whitelist is modified
+persistent ghost mathint g_whitelistStorageCount {
+    init_state axiom g_whitelistStorageCount == 0;
+}
+
+/// @notice track amount s_blacklist is modified
+persistent ghost mathint g_blacklistStorageCount {
+    init_state axiom g_blacklistStorageCount == 0;
+}
+
+/// @notice track amount s_admins is modified
+persistent ghost mathint g_adminStorageCount {
+    init_state axiom g_adminStorageCount == 0;
+}
+
+/// @notice track status of s_whitelistEnabled
+persistent ghost bool g_whitelistEnabled {
+    init_state axiom g_whitelistEnabled == false;
+}
+
+/// @notice track amount s_whitelistEnabled is modified
+persistent ghost mathint g_whitelistEnabledStorageCount {
+    init_state axiom g_whitelistEnabledStorageCount == 0;
+}
+
+// /// @notice track amount UpdatedBaseURI event is emitted
+// persistent ghost mathint g_updatedBaseURIEventCount {
+//     init_state axiom g_updatedBaseURIEventCount == 0;
+// }
+
+// /// @notice track amount s_baseURI is modified
+// persistent ghost mathint g_baseURIStorageCount {
+//     init_state axiom g_baseURIStorageCount == 0;
+// }
+
 /*//////////////////////////////////////////////////////////////
                              HOOKS
 //////////////////////////////////////////////////////////////*/
@@ -128,19 +226,59 @@ hook Sstore currentContract._balances[KEY address account] uint256 newBalance (u
     g_balances[account] = newBalance;
 }
 
-/// @notice Update g_admins when s_admins is modified
+/// @notice update g_admins and increment g_adminStorageCount when s_admins is modified
 hook Sstore currentContract.s_admins[KEY address a] bool newStatus (bool oldStatus) {
     g_admins[a] = newStatus;
+    g_adminStorageCount = g_adminStorageCount + 1;
 }
 
-/// @notice Update g_whitelisted when s_whitelist is modified
+/// @notice update g_whitelisted and increment g_whitelistStorageCount when s_whitelist is modified
 hook Sstore currentContract.s_whitelist[KEY address a] bool newStatus (bool oldStatus) {
     g_whitelisted[a] = newStatus;
+    g_whitelistStorageCount = g_whitelistStorageCount + 1;
 }
 
-/// @notice Update g_blacklisted when s_blacklist is modified
+/// @notice update g_blacklisted and increment g_blacklistStorageCount when s_blacklist is modified
 hook Sstore currentContract.s_blacklist[KEY address a] bool newStatus (bool oldStatus) {
     g_blacklisted[a] = newStatus;
+    g_blacklistStorageCount = g_blacklistStorageCount + 1;
+}
+
+/// @notice update g_whitelistEnabled and increment g_whitelistEnabledStorageCount when s_whitelistEnabled is modified
+hook Sstore currentContract.s_whitelistEnabled bool newStatus (bool oldStatus) {
+    g_whitelistEnabled = newStatus;
+    g_whitelistEnabledStorageCount = g_whitelistEnabledStorageCount + 1;
+}
+
+// /// @notice increment g_baseURIStorageCount when s_baseURI is modified
+// hook Sstore currentContract.s_baseURI string newBaseURI (string oldBaseURI) {
+//     g_baseURIStorageCount = g_baseURIStorageCount + 1;
+// }
+
+// /// @notice hook onto emitted UpdatedBaseURI event and increment relevant ghost
+// hook LOG1(uint offset, uint length, bytes32 t0) {
+//     if (t0 == UpdatedBaseURIEvent())
+//         g_updatedBaseURIEventCount = g_updatedBaseURIEventCount + 1;
+// }
+
+/// @notice hook onto emitted events and increment relevant ghosts
+hook LOG2(uint offset, uint length, bytes32 t0, bytes32 t1) {
+    if (t0 == AddedToWhitelistEvent())
+        g_addedToWhitelistEventCount = g_addedToWhitelistEventCount + 1;
+    if (t0 == RemovedFromWhitelistEvent())
+        g_removedFromWhitelistEventCount = g_removedFromWhitelistEventCount + 1;
+    if (t0 == AddedToBlacklistEvent())
+        g_addedToBlacklistEventCount = g_addedToBlacklistEventCount + 1;
+    if (t0 == RemovedFromBlacklistEvent())
+        g_removedFromBlacklistEventCount = g_removedFromBlacklistEventCount + 1;
+    if (t0 == UpdatedWhitelistEnabledEvent())
+        g_updatedWhitelistEnabledEventCount = g_updatedWhitelistEnabledEventCount + 1;
+}
+
+/// @notice hook onto emitted AdminStatusSet event and increment relevant ghost
+hook LOG3(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2) {
+    if (t0 == AdminStatusSetEvent())
+        g_adminStatusSetEventCount = g_adminStatusSetEventCount + 1;
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -175,6 +313,26 @@ invariant noTransfers()
 /// @notice blacklisted accounts cannot be whitelisted
 invariant blacklistedCantBeWhitelisted(address a)
     getBlacklisted(a) => !getWhitelisted(a);
+
+/// @notice total whitelist storage updates should equal sum of AddedToWhitelist and RemovedFromWhitelist events
+invariant whitelist_eventConsistency()
+    g_whitelistStorageCount == g_addedToWhitelistEventCount + g_removedFromWhitelistEventCount;
+
+/// @notice total blacklist storage updates should equal sum of AddedToBlacklist and RemovedFromBlacklist events
+invariant blacklist_eventConsistency()
+    g_blacklistStorageCount == g_addedToBlacklistEventCount + g_removedFromBlacklistEventCount;
+
+/// @notice total admin storage updates should equal total AdminStatusSet events
+invariant admin_eventConsistency()
+    g_adminStorageCount == g_adminStatusSetEventCount;
+
+/// @notice total whitelist enabled storage updates should equal total UpdatedWhitelistEnabled events
+invariant whitelistEnabled_eventConsistency()
+    g_whitelistEnabledStorageCount == g_updatedWhitelistEnabledEventCount;
+
+// /// @notice total base URI storage updates should equal total UpdatedBaseURI events
+// invariant baseURI_eventConsistency()
+//     g_baseURIStorageCount == g_updatedBaseURIEventCount;
 
 /*//////////////////////////////////////////////////////////////
                              RULES
@@ -251,26 +409,24 @@ rule onlyOwner_revertsWhen_nonOwner(method f) filtered {f -> onlyOwner(f)} {
     assert lastReverted;
 }
 
-// ------------------------------------------------------------//
-// ------------------------------------------------------------//
-// ------------------------------------------------------------//
-// ------------------------------------------------------------//
-// ------------------------------------------------------------//
-// ------------------------------------------------------------//
-
-rule mintAsWhitelisted_revertsWhen_whitelistDisabled() {
+/// @notice approvals revert
+rule approvals_alwaysRevert(method f) filtered {f -> canApprove(f)} {
     env e;
     calldataarg args;
-    require !getWhitelistEnabled();
-
-    mintAsWhitelisted@withrevert(e, args);
+    f@withrevert(e, args);
     assert lastReverted;
 }
+
+// ------------------------------------------------------------//
+// ------------------------------------------------------------//
+// ------------------------------------------------------------//
+// ------------------------------------------------------------//
+// ------------------------------------------------------------//
+// ------------------------------------------------------------//
 
 /*//////////////////////////////////////////////////////////////
                            WHITELIST
 //////////////////////////////////////////////////////////////*/
-
 // --- setWhitelistEnabled --- //
 rule setWhitelistEnabled_revertsWhen_whitelistStatusAlreadySet() {
     env e;
@@ -500,6 +656,7 @@ rule batchAddToBlacklist_success() {
 rule removeFromBlacklist_revertsWhen_notBlacklisted() {
     env e;
     address a;
+    require getIsAdmin(e.msg.sender);
     require !getBlacklisted(a);
     removeFromBlacklist@withrevert(e, a);
     assert lastReverted;
@@ -544,7 +701,6 @@ rule batchRemoveFromBlacklist_success() {
 /*//////////////////////////////////////////////////////////////
                               MINT
 //////////////////////////////////////////////////////////////*/
-
 // --- batchMintAsAdmin --- //
 rule batchMintAsAdmin_revertsWhen_notWhitelisted_ifWhitelistEnabled() {
     env e;
@@ -594,4 +750,129 @@ rule batchMintAsAdmin_success() {
     require balanceOf(a[0]) == 0;
     batchMintAsAdmin(e, a);
     assert balanceOf(a[0]) == 1;
+}
+
+// --- mintAsAdmin --- //
+rule mintAsAdmin_revertsWhen_alreadyMinted () {
+    env e;
+    address a;
+    require getIsAdmin(e.msg.sender);
+    require balanceOf(a) > 0;
+
+    mintAsAdmin@withrevert(e, a);
+    assert lastReverted;
+}
+
+rule mintAsAdmin_revertsWhen_blacklisted () {
+    env e;
+    address a;
+    require getIsAdmin(e.msg.sender);
+    require getBlacklisted(a);
+
+    mintAsAdmin@withrevert(e, a);
+    assert lastReverted;
+}
+
+rule mintAsAdmin_revertsWhen_notWhitelistedWhenEnabled () {
+    env e;
+    address a;
+    require getIsAdmin(e.msg.sender);
+    require getWhitelistEnabled();
+    require !getWhitelisted(a);
+
+    mintAsAdmin@withrevert(e, a);
+    assert lastReverted;
+}
+
+rule mintAsAdmin_success () {
+    env e;
+    address a;
+    mintAsAdmin(e, a);
+    assert balanceOf(a) == 1;
+}
+
+// --- mintAsWhitelisted --- //
+rule mintAsWhitelisted_revertsWhen_whitelistDisabled() {
+    env e;
+    calldataarg args;
+    require !getWhitelistEnabled();
+
+    mintAsWhitelisted@withrevert(e, args);
+    assert lastReverted;
+}
+
+rule mintAsWhitelisted_revertsWhen_notWhitelisted() {
+    env e;
+    require getWhitelistEnabled();
+    require !getWhitelisted(e.msg.sender);
+
+    mintAsWhitelisted@withrevert(e);
+    assert lastReverted;
+}
+
+rule mintAsWhitelisted_revertsWhen_alreadyMinted() {
+    env e;
+    require getWhitelistEnabled();
+    require getWhitelisted(e.msg.sender);
+    require balanceOf(e.msg.sender) > 0;
+
+    mintAsWhitelisted@withrevert(e);
+    assert lastReverted;
+}
+
+rule mintAsWhitelisted_success() {
+    env e;
+    mintAsWhitelisted(e);
+    assert balanceOf(e.msg.sender) == 1;
+}
+
+/*//////////////////////////////////////////////////////////////
+                           SET ADMIN
+//////////////////////////////////////////////////////////////*/
+// --- setAdmin --- //
+rule setAdmin_revertsWhen_alreadySet() {
+    env e;
+    address a;
+    require e.msg.sender == owner();
+
+    setAdmin@withrevert(e, a, getIsAdmin(a));
+    assert lastReverted;
+}
+
+rule setAdmin_success() {
+    env e;
+    address a;
+    bool isAdmin;
+    setAdmin(e, a, isAdmin);
+    assert isAdmin == getIsAdmin(a);
+}
+
+// --- batchSetAdmin --- //
+rule batchSetAdmin_revertsWhen_alreadySet() {
+    env e;
+    address[] a;
+    require e.msg.sender == owner();
+
+    batchSetAdmin@withrevert(e, a, getIsAdmin(a[0]));
+    assert lastReverted;
+}
+
+rule batchSetAdmin_revertsWhen_emptyArray() {
+    env e;
+    address[] a;
+    bool isAdmin;
+    require a.length == 0;
+    require e.msg.sender == owner();
+    batchSetAdmin@withrevert(e, a, isAdmin);
+    assert lastReverted;
+}
+
+rule batchSetAdmin_success() {
+    env e;
+    address[] a;
+    bool isAdmin;
+
+    batchSetAdmin(e, a, isAdmin);
+
+    assert forall uint256 i. i < a.length => g_admins[a[i]] == isAdmin;
 }
