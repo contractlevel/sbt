@@ -13,6 +13,11 @@ import {ISoulBoundToken} from "./interfaces/ISoulBoundToken.sol";
 /// @title SoulBoundToken
 /// @author @contractlevel
 /// @notice Non-transferrable ERC721 token with administrative whitelist and blacklist functionality
+/// @notice System Actors: Owner, Admins, Whitelisted, Blacklisted
+/// @dev Owner - sets admin role and base URI
+/// @dev Admins - set whitelisted and blacklisted roles, and enables/disables whitelist
+/// @dev Whitelisted - can mint a token if whitelist is enabled
+/// @dev Blacklisted - if held token, then burnt, and if whitelisted, then removed, and cant be whitelisted or minted
 contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
@@ -74,6 +79,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @param symbol The symbol of the token
     /// @param baseURI The base URI for the token
     /// @param whitelistEnabled Whether the whitelist is enabled
+    /// @dev Initializes the token ID counter to 1
     constructor(string memory name, string memory symbol, string memory baseURI, bool whitelistEnabled)
         ERC721(name, symbol)
         Ownable(msg.sender)
@@ -91,19 +97,19 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @return uint256 The ID of the minted token
     /// @dev Revert if account is not whitelisted when whitelist is enabled
     /// @dev Revert if account is blacklisted
-    /// @dev Revert if account already minted a token
+    /// @dev Revert if account already holds a token
     /// @notice This function is only callable by the contract admins
     function mintAsAdmin(address account) external onlyAdmin returns (uint256) {
         return _mintAsAdmin(account);
     }
 
-    /// @dev Mints a new token to the specified addresses
+    /// @dev Mints a new token to each of the specified addresses
     /// @param accounts Addresses to mint the tokens to
     /// @return uint256[] The IDs of the minted tokens
     /// @dev Revert if accounts array is empty
     /// @dev Revert if any of the accounts are not whitelisted when whitelist is enabled
     /// @dev Revert if any of the accounts are blacklisted
-    /// @dev Revert if any of the accounts have already been minted a token
+    /// @dev Revert if any of the accounts already hold a token
     /// @notice This function is only callable by the contract admins
     function batchMintAsAdmin(address[] calldata accounts) external onlyAdmin returns (uint256[] memory) {
         _revertIfEmptyArray(accounts);
@@ -122,7 +128,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @return uint256 The ID of the minted token
     /// @dev Revert if whitelist is disabled
     /// @dev Revert if msg.sender is not whitelisted
-    /// @dev Revert if msg.sender already minted a token
+    /// @dev Revert if msg.sender already holds a token
     function mintAsWhitelisted() external returns (uint256) {
         if (!_isWhitelistEnabled()) revert SoulBoundToken__WhitelistDisabled();
         _revertIfNotWhitelisted(msg.sender);
@@ -142,9 +148,8 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
 
     /// @dev Adds multiple addresses to the whitelist
     /// @param accounts Addresses to add to the whitelist
-    /// @dev This will revert if any of the accounts are blacklisted or already whitelisted to save gas on SLOADs
+    /// @dev Revert if any of the accounts are blacklisted or already whitelisted
     /// @dev Revert if accounts array is empty
-    /// @dev Revert if any account == zero address
     /// @notice This function is only callable by the contract admins
     function batchAddToWhitelist(address[] calldata accounts) external onlyAdmin {
         _revertIfEmptyArray(accounts);
@@ -175,15 +180,21 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @dev Adds an address to the blacklist
     /// @param account Address to add to the blacklist
     /// @notice This function is only callable by the contract admins
+    /// @notice If the account holds a token, it will be burned
+    /// @dev Revert if account == zero address
+    /// @dev Revert if account is already blacklisted
+    /// @dev Removes the account from the whitelist if present
     function addToBlacklist(address account) external onlyAdmin {
         _addToBlacklist(account);
     }
 
     /// @dev Adds multiple addresses to the blacklist
     /// @param accounts Addresses to add to the blacklist
-    /// @dev This will revert if any of the accounts are already blacklisted to save gas on SLOADs
-    /// @dev Revert if accounts array is empty
     /// @notice This function is only callable by the contract admins
+    /// @notice For each account, if they hold a token, it will be burned
+    /// @dev Revert if any of the accounts are already blacklisted
+    /// @dev Revert if accounts array is empty
+    /// @dev Removes each account from the whitelist if present
     function batchAddToBlacklist(address[] calldata accounts) external onlyAdmin {
         _revertIfEmptyArray(accounts);
         for (uint256 i = 0; i < accounts.length; ++i) {
@@ -302,6 +313,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @dev Revert if account == zero address
     /// @dev Revert if account already blacklisted
     /// @notice Removes account from whitelist if present
+    /// @notice Will burn token if the account holds one
     function _addToBlacklist(address account) internal {
         _revertIfZeroAddress(account);
         _revertIfBlacklisted(account);
