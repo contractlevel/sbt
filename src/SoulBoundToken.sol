@@ -417,6 +417,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @dev Checks if an address is an admin
     /// @param account Address to check
     /// @return bool Whether the address is an admin
+    // @review - should be renamed getAdmin
     function getIsAdmin(address account) external view returns (bool) {
         return s_admins[account];
     }

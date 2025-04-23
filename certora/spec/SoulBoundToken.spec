@@ -16,6 +16,9 @@ methods {
     function ownerOf(uint256) external returns (address) envfree;
     function getWhitelistEnabled() external returns (bool) envfree;
     function setWhitelistEnabled(bool) external;
+
+    // Harness helper functions
+    function bytes32ToBool(bytes32) external returns (bool) envfree;
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -192,6 +195,26 @@ persistent ghost mathint g_whitelistEnabledStorageCount {
     init_state axiom g_whitelistEnabledStorageCount == 0;
 }
 
+/// @notice track whether a user is whitelisted according to AddedToWhitelist and RemovedFromWhitelist event params
+persistent ghost mapping(address => bool) g_whitelistedEventParams {
+    init_state axiom forall address a. g_whitelistedEventParams[a] == false;
+}
+
+/// @notice track whether a user is blacklisted according to AddedToBlacklist and RemovedFromBlacklist event params
+persistent ghost mapping(address => bool) g_blacklistedEventParams {
+    init_state axiom forall address a. g_blacklistedEventParams[a] == false;
+}
+
+/// @notice track whether emitted values from AdminStatusSet
+persistent ghost mapping(address => bool) g_adminEventParams {
+    init_state axiom forall address a. g_adminEventParams[a] == false;
+}
+
+/// @notice track UpdatedWhitelistEnabled event param
+persistent ghost bool g_updatedWhitelistEnabledEventParam {
+    init_state axiom g_updatedWhitelistEnabledEventParam == false;
+}
+
 /*//////////////////////////////////////////////////////////////
                              HOOKS
 //////////////////////////////////////////////////////////////*/
@@ -238,22 +261,34 @@ hook Sstore currentContract.s_whitelistEnabled bool newStatus (bool oldStatus) {
 
 /// @notice hook onto emitted events and increment relevant ghosts
 hook LOG2(uint offset, uint length, bytes32 t0, bytes32 t1) {
-    if (t0 == AddedToWhitelistEvent())
+    if (t0 == AddedToWhitelistEvent()) {
         g_addedToWhitelistEventCount = g_addedToWhitelistEventCount + 1;
-    if (t0 == RemovedFromWhitelistEvent())
+        g_whitelistedEventParams[assert_address(t1)] = true;
+    }
+    if (t0 == RemovedFromWhitelistEvent()) {
         g_removedFromWhitelistEventCount = g_removedFromWhitelistEventCount + 1;
-    if (t0 == AddedToBlacklistEvent())
+        g_whitelistedEventParams[assert_address(t1)] = false;
+    }
+    if (t0 == AddedToBlacklistEvent()) {
         g_addedToBlacklistEventCount = g_addedToBlacklistEventCount + 1;
-    if (t0 == RemovedFromBlacklistEvent())
+        g_blacklistedEventParams[assert_address(t1)] = true;
+    }
+    if (t0 == RemovedFromBlacklistEvent()) {
         g_removedFromBlacklistEventCount = g_removedFromBlacklistEventCount + 1;
-    if (t0 == UpdatedWhitelistEnabledEvent())
+        g_blacklistedEventParams[assert_address(t1)] = false;
+    }
+    if (t0 == UpdatedWhitelistEnabledEvent()) {
         g_updatedWhitelistEnabledEventCount = g_updatedWhitelistEnabledEventCount + 1;
+        g_updatedWhitelistEnabledEventParam = bytes32ToBool(t1);
+    }
 }
 
 /// @notice hook onto emitted AdminStatusSet event and increment relevant ghost
 hook LOG3(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2) {
-    if (t0 == AdminStatusSetEvent())
+    if (t0 == AdminStatusSetEvent()) {
         g_adminStatusSetEventCount = g_adminStatusSetEventCount + 1;
+        g_adminEventParams[assert_address(t1)] = bytes32ToBool(t2);
+    }
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -304,6 +339,22 @@ invariant admin_eventConsistency()
 /// @notice total whitelist enabled storage updates should equal total UpdatedWhitelistEnabled events
 invariant whitelistEnabled_eventConsistency()
     g_whitelistEnabledStorageCount == g_updatedWhitelistEnabledEventCount;
+
+/// @notice the bool emitted by UpdatedWhitelistEnabled event should match the stored value
+invariant whitelistEnabled_eventParams()
+    g_updatedWhitelistEnabledEventParam == getWhitelistEnabled();
+
+/// @notice whitelisted addresses should be consistent with params emitted by AddedToWhitelist and RemovedFromWhitelist
+invariant whitelist_eventParams(address a)
+    g_whitelistedEventParams[a] == getWhitelisted(a);
+
+/// @notice blacklisted addresses should be consistent with params emitted by AddedToBlacklist and RemovedFromBlacklist
+invariant blacklist_eventParams(address a)
+    g_blacklistedEventParams[a] == getBlacklisted(a);
+
+/// @notice admin status emitted in AdminStatusSet should be consistent with stored value
+invariant admin_eventParams(address a)
+    g_adminEventParams[a] == getIsAdmin(a);
 
 /*//////////////////////////////////////////////////////////////
                              RULES
@@ -408,7 +459,6 @@ rule setWhitelistEnabled_revertsWhen_whitelistStatusAlreadySet() {
 
 rule setWhitelistEnabled_success() {
     env e;
-    require getIsAdmin(e.msg.sender);
     bool oldWhitelistEnabled = getWhitelistEnabled();
     setWhitelistEnabled(e, !oldWhitelistEnabled);
     assert getWhitelistEnabled() != oldWhitelistEnabled;
@@ -444,7 +494,6 @@ rule addToWhitelist_revertsWhen_blacklisted() {
 rule addToWhitelist_success() {
     env e;
     address a;
-    require getIsAdmin(e.msg.sender);
     addToWhitelist(e, a);
     assert getWhitelisted(a);
 }
@@ -534,7 +583,6 @@ rule removeFromWhitelist_revertsWhen_notWhitelisted() {
 rule removeFromWhitelist_success() {
     env e;
     address a;
-    require getWhitelisted(a);
     removeFromWhitelist(e, a);
     assert !getWhitelisted(a);
 }
@@ -606,15 +654,15 @@ rule batchAddToBlacklist_revertsWhen_emptyArray() {
 rule batchAddToBlacklist_success() {
     env e;
     address[] a;
-    uint256 index;
+    uint256 i;
 
     require a.length == 3
-        &&  ownershipConsistency(a[0], index)
-        &&  ownershipConsistency(a[1], index)
-        &&  ownershipConsistency(a[2], index);
-    requireInvariant oneTokenPerAccount(a[0], index);
-    requireInvariant oneTokenPerAccount(a[1], index);
-    requireInvariant oneTokenPerAccount(a[2], index);
+        &&  ownershipConsistency(a[0], i)
+        &&  ownershipConsistency(a[1], i)
+        &&  ownershipConsistency(a[2], i);
+    requireInvariant oneTokenPerAccount(a[0], i);
+    requireInvariant oneTokenPerAccount(a[1], i);
+    requireInvariant oneTokenPerAccount(a[2], i);
 
     batchAddToBlacklist(e, a);
 
@@ -636,7 +684,6 @@ rule removeFromBlacklist_revertsWhen_notBlacklisted() {
 rule removeFromBlacklist_success() {
     env e;
     address a;
-    require getBlacklisted(a);
     removeFromBlacklist(e, a);
     assert !getBlacklisted(a);
 }
@@ -713,6 +760,7 @@ rule batchMintAsAdmin_revertsWhen_emptyArray() {
     assert lastReverted;
 }
 
+// @review this one
 rule batchMintAsAdmin_success() {
     env e;
     address[] a;
