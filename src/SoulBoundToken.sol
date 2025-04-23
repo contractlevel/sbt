@@ -389,6 +389,9 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
         return s_whitelistEnabled;
     }
 
+    /// @dev Sets the admin status for an address
+    /// @param account The address to set the admin status for
+    /// @param isAdmin The admin status to set
     function _setAdmin(address account, bool isAdmin) internal {
         if (s_admins[account] == isAdmin) revert SoulBoundToken__AdminStatusAlreadySet(account, isAdmin);
         s_admins[account] = isAdmin;
