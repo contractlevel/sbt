@@ -17,3 +17,4 @@ report.md
 .vscode
 .notes.md
 .certora_internal/
+gambit_out/

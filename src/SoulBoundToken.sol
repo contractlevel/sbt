@@ -250,7 +250,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @param account Address to mint the token to
     /// @return tokenId The ID of the minted token
     function _mintSoulBoundToken(address account) internal returns (uint256 tokenId) {
-        tokenId = _incrementTokenIdCounter(1); //
+        tokenId = _incrementTokenIdCounter(1);
         _safeMint(account, tokenId);
         return tokenId;
     }

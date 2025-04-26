@@ -16,6 +16,7 @@ methods {
     function ownerOf(uint256) external returns (address) envfree;
     function getWhitelistEnabled() external returns (bool) envfree;
     function setWhitelistEnabled(bool) external;
+    function getTokenIdCounter() external returns (uint256) envfree;
 
     // Harness helper functions
     function bytes32ToBool(bytes32) external returns (bool) envfree;
@@ -215,6 +216,11 @@ persistent ghost bool g_updatedWhitelistEnabledEventParam {
     init_state axiom g_updatedWhitelistEnabledEventParam == false;
 }
 
+/// @notice track whether emitted values from AdminStatusSet
+persistent ghost mapping(address => uint256) g_holderToTokenId {
+    init_state axiom forall address a. g_holderToTokenId[a] == 0;
+}
+
 /*//////////////////////////////////////////////////////////////
                              HOOKS
 //////////////////////////////////////////////////////////////*/
@@ -228,6 +234,7 @@ hook Sstore currentContract._allTokens.length uint256 newValue (uint256 oldValue
 /// @notice the only transfers should be mint and burn (ie from and to address(0))
 hook Sstore currentContract._owners[KEY uint256 tokenId] address newOwner (address oldOwner) {
     if (oldOwner != 0 && newOwner != 0) g_transferHappened = true;
+    g_holderToTokenId[newOwner] = tokenId;
 }
 
 /// @notice update g_balances ghost for an account when storage changes
@@ -654,21 +661,25 @@ rule batchAddToBlacklist_revertsWhen_emptyArray() {
 rule batchAddToBlacklist_success() {
     env e;
     address[] a;
-    uint256 i;
+    uint256 index;
 
     require a.length == 3
-        &&  ownershipConsistency(a[0], i)
-        &&  ownershipConsistency(a[1], i)
-        &&  ownershipConsistency(a[2], i);
-    requireInvariant oneTokenPerAccount(a[0], i);
-    requireInvariant oneTokenPerAccount(a[1], i);
-    requireInvariant oneTokenPerAccount(a[2], i);
+        &&  ownershipConsistency(a[0], index)
+        &&  ownershipConsistency(a[1], index)
+        &&  ownershipConsistency(a[2], index);
+    requireInvariant oneTokenPerAccount(a[0], index);
+    requireInvariant oneTokenPerAccount(a[1], index);
+    requireInvariant oneTokenPerAccount(a[2], index);
 
     batchAddToBlacklist(e, a);
 
-    assert  balanceOf(a[0]) == 0 && getBlacklisted(a[0]) && !getWhitelisted(a[0]) 
-        &&  balanceOf(a[1]) == 0 && getBlacklisted(a[1]) && !getWhitelisted(a[1]) 
-        &&  balanceOf(a[2]) == 0 && getBlacklisted(a[2]) && !getWhitelisted(a[2]);
+    assert forall uint256 i. i < a.length => g_balances[a[i]] == 0;
+    assert forall uint256 i. i < a.length => g_blacklisted[a[i]];
+    assert forall uint256 i. i < a.length => !g_whitelisted[a[i]];
+
+    // assert  balanceOf(a[0]) == 0 && getBlacklisted(a[0]) && !getWhitelisted(a[0]) 
+    //     &&  balanceOf(a[1]) == 0 && getBlacklisted(a[1]) && !getWhitelisted(a[1]) 
+    //     &&  balanceOf(a[2]) == 0 && getBlacklisted(a[2]) && !getWhitelisted(a[2]);
 }
 
 // --- removeFromBlacklist --- //
@@ -760,15 +771,17 @@ rule batchMintAsAdmin_revertsWhen_emptyArray() {
     assert lastReverted;
 }
 
-// @review this one
 rule batchMintAsAdmin_success() {
     env e;
     address[] a;
-    require getIsAdmin(e.msg.sender);
-    require !getWhitelistEnabled();
-    require balanceOf(a[0]) == 0;
+
+    uint256 startId = getTokenIdCounter();
+    require startId >= 1;
+
     batchMintAsAdmin(e, a);
-    assert balanceOf(a[0]) == 1;
+
+    assert forall uint256 i. i < a.length => g_holderToTokenId[a[i]] == startId + i;
+    assert forall uint256 i. i < a.length => g_balances[a[i]] == 1;
 }
 
 // --- mintAsAdmin --- //
