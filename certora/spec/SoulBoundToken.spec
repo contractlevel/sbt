@@ -12,7 +12,7 @@ methods {
     function balanceOf(address) external returns (uint256) envfree;
     function getWhitelisted(address) external returns (bool) envfree;
     function getBlacklisted(address) external returns (bool) envfree;
-    function getIsAdmin(address) external returns (bool) envfree;
+    function getAdmin(address) external returns (bool) envfree;
     function ownerOf(uint256) external returns (address) envfree;
     function getWhitelistEnabled() external returns (bool) envfree;
     function setWhitelistEnabled(bool) external;
@@ -361,7 +361,7 @@ invariant blacklist_eventParams(address a)
 
 /// @notice admin status emitted in AdminStatusSet should be consistent with stored value
 invariant admin_eventParams(address a)
-    g_adminEventParams[a] == getIsAdmin(a);
+    g_adminEventParams[a] == getAdmin(a);
 
 /*//////////////////////////////////////////////////////////////
                              RULES
@@ -420,7 +420,7 @@ rule nonBurningDoesNotDecreaseTotalSupply(method f) filtered {f -> !canBurn(f)} 
 rule onlyAdmin_revertsWhen_nonAdmin(method f) filtered {f -> onlyAdmin(f)} {
     env e;
     calldataarg args;
-    require !getIsAdmin(e.msg.sender);
+    require !getAdmin(e.msg.sender);
 
     f@withrevert(e, args);
 
@@ -459,7 +459,7 @@ rule approvals_alwaysRevert(method f) filtered {f -> canApprove(f)} {
 // --- setWhitelistEnabled --- //
 rule setWhitelistEnabled_revertsWhen_whitelistStatusAlreadySet() {
     env e;
-    require getIsAdmin(e.msg.sender);
+    require getAdmin(e.msg.sender);
     setWhitelistEnabled@withrevert(e, getWhitelistEnabled());
     assert lastReverted;
 }
@@ -475,7 +475,7 @@ rule setWhitelistEnabled_success() {
 rule addToWhitelist_revertsWhen_zeroAddress() {
     env e;
     address a = 0;
-    require getIsAdmin(e.msg.sender);
+    require getAdmin(e.msg.sender);
     addToWhitelist@withrevert(e, a);
     assert lastReverted;
 }
@@ -484,7 +484,7 @@ rule addToWhitelist_revertsWhen_alreadyWhitelisted() {
     env e;
     address a;
     require getWhitelisted(a);
-    require getIsAdmin(e.msg.sender);
+    require getAdmin(e.msg.sender);
     addToWhitelist@withrevert(e, a);
     assert lastReverted;
 }
@@ -493,7 +493,7 @@ rule addToWhitelist_revertsWhen_blacklisted() {
     env e;
     address a;
     require getBlacklisted(a);
-    require getIsAdmin(e.msg.sender);
+    require getAdmin(e.msg.sender);
     addToWhitelist@withrevert(e, a);
     assert lastReverted;
 }
@@ -510,7 +510,7 @@ rule batchAddToWhitelist_revertsWhen_zeroAddress() {
     env e;
     address[] a;
     require a[0] == 0;
-    require getIsAdmin(e.msg.sender);
+    require getAdmin(e.msg.sender);
     batchAddToWhitelist@withrevert(e, a);
     assert lastReverted;
 }
@@ -519,7 +519,7 @@ rule batchAddToWhitelist_revertsWhen_alreadyWhitelisted() {
     env e;
     address[] a;
     require getWhitelisted(a[0]);
-    require getIsAdmin(e.msg.sender);
+    require getAdmin(e.msg.sender);
     batchAddToWhitelist@withrevert(e, a);
     assert lastReverted;
 }
@@ -528,7 +528,7 @@ rule batchAddToWhitelist_revertsWhen_blacklisted() {
     env e;
     address[] a;
     require getBlacklisted(a[0]);
-    require getIsAdmin(e.msg.sender);
+    require getAdmin(e.msg.sender);
     batchAddToWhitelist@withrevert(e, a);
     assert lastReverted;
 }
@@ -537,7 +537,7 @@ rule batchAddToWhitelist_revertsWhen_emptyArray() {
     env e;
     address[] a;
     require a.length == 0;
-    require getIsAdmin(e.msg.sender);
+    require getAdmin(e.msg.sender);
     batchAddToWhitelist@withrevert(e, a);
     assert lastReverted;
 }
@@ -556,7 +556,7 @@ rule batchRemoveFromWhitelist_revertsWhen_notWhitelisted() {
     env e;
     address[] a;
     require !getWhitelisted(a[0]);
-    require getIsAdmin(e.msg.sender);
+    require getAdmin(e.msg.sender);
     batchRemoveFromWhitelist@withrevert(e, a);
     assert lastReverted;
 }
@@ -565,7 +565,7 @@ rule batchRemoveFromWhitelist_revertsWhen_emptyArray() {
     env e;
     address[] a;
     require a.length == 0;
-    require getIsAdmin(e.msg.sender);
+    require getAdmin(e.msg.sender);
     batchRemoveFromWhitelist@withrevert(e, a);
     assert lastReverted;
 }
@@ -601,7 +601,7 @@ rule removeFromWhitelist_success() {
 rule addToBlacklist_revertsWhen_zeroAddress() {
     env e;
     address a = 0;
-    require getIsAdmin(e.msg.sender);
+    require getAdmin(e.msg.sender);
     addToBlacklist@withrevert(e, a);
     assert lastReverted;
 }
@@ -610,7 +610,7 @@ rule addToBlacklist_revertsWhen_alreadyBlacklisted() {
     env e;
     address a;
     require getBlacklisted(a);
-    require getIsAdmin(e.msg.sender);
+    require getAdmin(e.msg.sender);
     addToBlacklist@withrevert(e, a);
     assert lastReverted;
 }
@@ -635,7 +635,7 @@ rule batchAddToBlacklist_revertsWhen_zeroAddress() {
     env e;
     address[] a;
     require a[0] == 0;
-    require getIsAdmin(e.msg.sender);
+    require getAdmin(e.msg.sender);
     batchAddToBlacklist@withrevert(e, a);
     assert lastReverted;
 }
@@ -644,7 +644,7 @@ rule batchAddToBlacklist_revertsWhen_alreadyBlacklisted() {
     env e;
     address[] a;
     require getBlacklisted(a[0]);
-    require getIsAdmin(e.msg.sender);
+    require getAdmin(e.msg.sender);
     batchAddToBlacklist@withrevert(e, a);
     assert lastReverted;
 }
@@ -653,12 +653,12 @@ rule batchAddToBlacklist_revertsWhen_emptyArray() {
     env e;
     address[] a;
     require a.length == 0;
-    require getIsAdmin(e.msg.sender);
+    require getAdmin(e.msg.sender);
     batchAddToBlacklist@withrevert(e, a);
     assert lastReverted;
 }
 
-rule batchAddToBlacklist_success() {
+rule batchAddToBlacklist_success_burnsTokens() {
     env e;
     address[] a;
     uint256 index;
@@ -677,16 +677,25 @@ rule batchAddToBlacklist_success() {
     assert forall uint256 i. i < a.length => g_blacklisted[a[i]];
     assert forall uint256 i. i < a.length => !g_whitelisted[a[i]];
 
-    // assert  balanceOf(a[0]) == 0 && getBlacklisted(a[0]) && !getWhitelisted(a[0]) 
-    //     &&  balanceOf(a[1]) == 0 && getBlacklisted(a[1]) && !getWhitelisted(a[1]) 
-    //     &&  balanceOf(a[2]) == 0 && getBlacklisted(a[2]) && !getWhitelisted(a[2]);
+    assert  balanceOf(a[0]) == 0 && getBlacklisted(a[0]) && !getWhitelisted(a[0]) 
+        &&  balanceOf(a[1]) == 0 && getBlacklisted(a[1]) && !getWhitelisted(a[1]) 
+        &&  balanceOf(a[2]) == 0 && getBlacklisted(a[2]) && !getWhitelisted(a[2]);
+}
+
+rule batchAddToBlacklist_success() {
+    env e;
+    address[] a;
+
+    batchAddToBlacklist(e, a);
+
+    assert forall uint256 i. i < a.length => g_blacklisted[a[i]];
 }
 
 // --- removeFromBlacklist --- //
 rule removeFromBlacklist_revertsWhen_notBlacklisted() {
     env e;
     address a;
-    require getIsAdmin(e.msg.sender);
+    require getAdmin(e.msg.sender);
     require !getBlacklisted(a);
     removeFromBlacklist@withrevert(e, a);
     assert lastReverted;
@@ -704,7 +713,7 @@ rule batchRemoveFromBlacklist_revertsWhen_notBlacklisted() {
     env e;
     address[] a;
     require !getBlacklisted(a[0]);
-    require getIsAdmin(e.msg.sender);
+    require getAdmin(e.msg.sender);
     batchRemoveFromBlacklist@withrevert(e, a);
     assert lastReverted;
 }
@@ -713,7 +722,7 @@ rule batchRemoveFromBlacklist_revertsWhen_emptyArray() {
     env e;
     address[] a;
     require a.length == 0;
-    require getIsAdmin(e.msg.sender);
+    require getAdmin(e.msg.sender);
     batchRemoveFromBlacklist@withrevert(e, a);
     assert lastReverted;
 }
@@ -734,7 +743,7 @@ rule batchRemoveFromBlacklist_success() {
 rule batchMintAsAdmin_revertsWhen_notWhitelisted_ifWhitelistEnabled() {
     env e;
     address[] a;
-    require getIsAdmin(e.msg.sender);
+    require getAdmin(e.msg.sender);
     require getWhitelistEnabled();
     require !getWhitelisted(a[0]);
     batchMintAsAdmin@withrevert(e, a);
@@ -745,7 +754,7 @@ rule batchMintAsAdmin_revertsWhen_blacklisted() {
     env e;
     address[] a;
     require getBlacklisted(a[0]);
-    require getIsAdmin(e.msg.sender);
+    require getAdmin(e.msg.sender);
     require !getWhitelistEnabled();
     batchMintAsAdmin@withrevert(e, a);
     assert lastReverted;
@@ -755,7 +764,7 @@ rule batchMintAsAdmin_revertsWhen_alreadyMinted() {
     env e;
     address[] a;
     require balanceOf(a[0]) == 1;
-    require getIsAdmin(e.msg.sender);
+    require getAdmin(e.msg.sender);
     require !getWhitelistEnabled();
     batchMintAsAdmin@withrevert(e, a);
     assert lastReverted;
@@ -765,7 +774,7 @@ rule batchMintAsAdmin_revertsWhen_emptyArray() {
     env e;
     address[] a;
     require a.length == 0;
-    require getIsAdmin(e.msg.sender);
+    require getAdmin(e.msg.sender);
     require !getWhitelistEnabled();
     batchMintAsAdmin@withrevert(e, a);
     assert lastReverted;
@@ -788,7 +797,7 @@ rule batchMintAsAdmin_success() {
 rule mintAsAdmin_revertsWhen_alreadyMinted () {
     env e;
     address a;
-    require getIsAdmin(e.msg.sender);
+    require getAdmin(e.msg.sender);
     require balanceOf(a) > 0;
 
     mintAsAdmin@withrevert(e, a);
@@ -798,7 +807,7 @@ rule mintAsAdmin_revertsWhen_alreadyMinted () {
 rule mintAsAdmin_revertsWhen_blacklisted () {
     env e;
     address a;
-    require getIsAdmin(e.msg.sender);
+    require getAdmin(e.msg.sender);
     require getBlacklisted(a);
 
     mintAsAdmin@withrevert(e, a);
@@ -808,7 +817,7 @@ rule mintAsAdmin_revertsWhen_blacklisted () {
 rule mintAsAdmin_revertsWhen_notWhitelistedWhenEnabled () {
     env e;
     address a;
-    require getIsAdmin(e.msg.sender);
+    require getAdmin(e.msg.sender);
     require getWhitelistEnabled();
     require !getWhitelisted(a);
 
@@ -867,7 +876,7 @@ rule setAdmin_revertsWhen_alreadySet() {
     address a;
     require e.msg.sender == owner();
 
-    setAdmin@withrevert(e, a, getIsAdmin(a));
+    setAdmin@withrevert(e, a, getAdmin(a));
     assert lastReverted;
 }
 
@@ -876,7 +885,7 @@ rule setAdmin_success() {
     address a;
     bool isAdmin;
     setAdmin(e, a, isAdmin);
-    assert isAdmin == getIsAdmin(a);
+    assert isAdmin == getAdmin(a);
 }
 
 // --- batchSetAdmin --- //
@@ -885,7 +894,7 @@ rule batchSetAdmin_revertsWhen_alreadySet() {
     address[] a;
     require e.msg.sender == owner();
 
-    batchSetAdmin@withrevert(e, a, getIsAdmin(a[0]));
+    batchSetAdmin@withrevert(e, a, getAdmin(a[0]));
     assert lastReverted;
 }
 

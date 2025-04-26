@@ -11,7 +11,7 @@ contract SetAdminTest is BaseTest {
     }
 
     function test_sbt_setAdmin_revertsWhen_alreadySet() public {
-        assertTrue(sbt.getIsAdmin(admin));
+        assertTrue(sbt.getAdmin(admin));
         _changePrank(owner);
         vm.expectRevert(abi.encodeWithSignature("SoulBoundToken__AdminStatusAlreadySet(address,bool)", admin, true));
         sbt.setAdmin(admin, true);
@@ -20,6 +20,6 @@ contract SetAdminTest is BaseTest {
     function test_sbt_setAdmin_success() public {
         _changePrank(owner);
         sbt.setAdmin(user, true);
-        assertTrue(sbt.getIsAdmin(user));
+        assertTrue(sbt.getAdmin(user));
     }
 }

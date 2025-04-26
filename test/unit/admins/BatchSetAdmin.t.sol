@@ -13,7 +13,7 @@ contract BatchSetAdminTest is BaseTest {
     }
 
     function test_sbt_batchSetAdmin_revertsWhen_adminStatusAlreadySet() public {
-        assertTrue(sbt.getIsAdmin(admin));
+        assertTrue(sbt.getAdmin(admin));
         accounts = new address[](1);
         accounts[0] = admin;
         _changePrank(owner);
@@ -32,6 +32,6 @@ contract BatchSetAdminTest is BaseTest {
         accounts[0] = user;
         _changePrank(owner);
         sbt.batchSetAdmin(accounts, true);
-        assertTrue(sbt.getIsAdmin(user));
+        assertTrue(sbt.getAdmin(user));
     }
 }

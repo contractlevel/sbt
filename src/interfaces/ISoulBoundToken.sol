@@ -18,7 +18,7 @@ interface ISoulBoundToken is IERC721Enumerable {
     function setWhitelistEnabled(bool whitelistEnabled) external;
     function getWhitelisted(address account) external view returns (bool);
     function getBlacklisted(address account) external view returns (bool);
-    function getIsAdmin(address account) external view returns (bool);
+    function getAdmin(address account) external view returns (bool);
     function getWhitelistEnabled() external view returns (bool);
     function getBaseURI() external view returns (string memory);
     function getTokenIdCounter() external view returns (uint256);

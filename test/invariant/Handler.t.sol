@@ -324,7 +324,7 @@ contract Handler is Test {
         address admin = _createOrGetAccount(adminSeed);
 
         /// @dev set admin
-        _setAdmin(admin, !sbt.getIsAdmin(admin));
+        _setAdmin(admin, !sbt.getAdmin(admin));
     }
 
     function batchSetAdmin(uint256 initialSeed, bool isAdmin) external {
@@ -338,7 +338,7 @@ contract Handler is Test {
             uint256 adminSeed = uint256(keccak256(abi.encode(initialSeed, i)));
             address account = _createAccount(adminSeed);
 
-            if (sbt.getIsAdmin(account) == isAdmin) _setAdmin(account, !isAdmin);
+            if (sbt.getAdmin(account) == isAdmin) _setAdmin(account, !isAdmin);
 
             /// @dev update admin ghosts
             _updateAdminGhosts(account, isAdmin);
@@ -487,10 +487,9 @@ contract Handler is Test {
 
     function _createOrGetAdmin(uint256 adminSeed) internal returns (address admin) {
         admin = _createOrGetAccount(adminSeed);
-        if (!sbt.getIsAdmin(admin)) _setAdmin(admin, true);
+        if (!sbt.getAdmin(admin)) _setAdmin(admin, true);
     }
 
-    // @review - should this be renamed to _seedToAccount?
     /// @dev convert an index to an existing account in a set
     /// @param addressIndex the index of the account to convert
     /// @return The account at the index
