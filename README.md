@@ -1,105 +1,291 @@
 # SoulBoundToken
 
-A SoulBoundToken contract for Optimism with administrative whitelist and blacklist functionality. Only 1 token can be held per address. Tokens can not be transferred or approved.
+A SoulBoundToken contract for Optimism with administrative whitelist and blacklist functionality. Only one token can be held per address. Tokens cannot be transferred or approved.
+
+## Table of Contents
+
+- [SoulBoundToken](#soulboundtoken)
+  - [Table of Contents](#table-of-contents)
+  - [Features](#features)
+  - [Roles](#roles)
+    - [Owner](#owner)
+    - [Admins](#admins)
+    - [Whitelisted](#whitelisted)
+    - [Blacklisted](#blacklisted)
+  - [Valid States](#valid-states)
+    - [Whitelist Enabled](#whitelist-enabled)
+    - [Whitelist Disabled](#whitelist-disabled)
+  - [Constructor/Deployment](#constructordeployment)
+  - [External Functions](#external-functions)
+    - [Minting](#minting)
+    - [Whitelist Management](#whitelist-management)
+    - [Blacklist Management](#blacklist-management)
+    - [Assign/Revoke Admin](#assignrevoke-admin)
+    - [Base URI](#base-uri)
+  - [Usage](#usage)
+  - [Testing](#testing)
+  - [Formal Verification](#formal-verification)
+  - [Important Notes](#important-notes)
+  - [Comments on Design Choices](#comments-on-design-choices)
+  - [License](#license)
+
+## Features
+
+- **Non-transferrable Tokens**: Tokens are "soulbound," meaning they cannot be transferred, traded, or approved for transfer.
+- **Single Token per Address**: Each address is limited to holding at most one token.
+- **Admin Roles**: Administrative roles enable controlled management of whitelists, blacklists, and contract settings.
+- **Whitelist Functionality**: Can be toggled on or off to restrict token minting to whitelisted addresses.
+- **Blacklist Functionality**: Blacklisted addresses have their tokens burned (if any) and are excluded from minting and whitelisting.
+- **Batch Operations**: Supports batch minting, whitelisting, blacklisting, and admin assignment for operational efficiency.
 
 ## Roles
 
-There are 4 key roles in this system:
-
-1. the owner
-2. the admins
-3. whitelisted
-4. blacklisted
+There are four key roles in this system:
 
 ### Owner
 
-- can assign and revoke admin role
-- can set the baseURI
+- Can assign and revoke admin roles.
+- Can set the base URI for token metadata.
 
 ### Admins
 
-- can assign and revoke whitelisted and blacklisted roles
-- can enable and disable whitelist
-- can mint tokens
+- Can assign and revoke whitelisted and blacklisted roles.
+- Can enable or disable the whitelist.
+- Can mint tokens to addresses (subject to whitelist and blacklist rules).
 
 ### Whitelisted
 
-- can mint themself a token if whitelist is enabled
+- Can mint a token for themselves if the whitelist is enabled.
 
 ### Blacklisted
 
-- can't be minted a token
-- if previously minted a token, their token is burned
-- if on whitelist, removed from whitelist
+- Cannot be minted a token.
+- If they previously held a token, it is burned upon blacklisting.
+- If they were on the whitelist, they are removed from it upon blacklisting.
 
 ## Valid States
 
-There are 2 valid states in this system:
-
-1. whitelist enabled ✅
-2. whitelist disabled ❌
+There are two valid states in this system:
 
 ### Whitelist Enabled
 
-- whitelisted accounts can mint a token
-- admins can mint tokens to whitelisted accounts
+- Whitelisted accounts can mint a token for themselves.
+- Admins can mint tokens to whitelisted accounts.
 
 ### Whitelist Disabled
 
-- admins can mint tokens to anyone who isn't blacklisted
+- Admins can mint tokens to any address that is not blacklisted.
 
 ## Constructor/Deployment
 
-When the SBT contract is deployed, values must be given for the token `name`, `symbol`, `baseURI` and a bool indicating whether whitelist is initially enabled or not.
+When the `SoulBoundToken` contract is deployed, the following parameters must be provided:
 
-## External Functions (that change state)
+- `name`: The name of the token (e.g., "SoulBoundToken").
+- `symbol`: The symbol of the token (e.g., "SBT").
+- `baseURI`: The base URI for token metadata (e.g., "https://ipfs.io/ipfs/<CID>/").
+- `whitelistEnabled`: A boolean indicating whether the whitelist is initially enabled (`true`) or disabled (`false`).
 
-### Mint
+The deployer of the contract becomes the initial owner. **NOTE: This can be changed so the initial owner can be set to another address on deployment.**
 
-- `mintAsAdmin(address)` - _onlyAdmin_
-  - admin passes an address to mint it a token
-- `mintAsWhitelisted()` - only when whitelist enabled
-  - whitelisted user calls to mint themself a token
-- `batchMintAsAdmin(address[] memory)` - _onlyAdmin_
-  - admin passes an array of addresses to mint each one a token
-  - each mint in the array will cost roughly the same gas as an individual `mintAsAdmin` call - _this needs to be reviewed, we should be able to make it more gas efficient_
+## External Functions
 
-### Whitelist
+Below are the external functions that modify the contract's state:
 
-- `addToWhitelist(address)` - _onlyAdmin_
-  - admin passes an address to add it to whitelist
-- `batchAddToWhitelist(address[] memory)` - _onlyAdmin_
-  - admin passes an array of addresses to add each to whitelist
-- `removeFromWhitelist(address)` - _onlyAdmin_
-  - admin passes an address to remove it from whitelist
-- `batchRemoveFromWhitelist(address[] memory)` - _onlyAdmin_
-  - admin passes an array of addresses to remove each from whitelist
-- `setWhitelistEnabled(bool)` - _onlyAdmin_
-  - admin passes a bool indicating whether whitelist is enabled or not
+### Minting
 
-### Blacklist
+- **`mintAsAdmin(address account)`**
 
-- `addToBlacklist(address)` - _onlyAdmin_
-  - admin passes an address to add it to blacklist
-- `batchAddToBlacklist(address[] memory)` - _onlyAdmin_
-  - admin passes an array of addresses to add each to blacklist
-- `removeFromBlacklist(address)` - _onlyAdmin_
-  - admin passes an address to remove it from blacklist
-- `batchRemoveFromBlacklist(address[] memory)` - _onlyAdmin_
-  - admin passes an array of addresses to remove each from blacklist
+  - **Description**: Allows an admin to mint a token to a specified address.
+  - **Requirements**:
+    - Caller must be an admin.
+    - If whitelist is enabled, `account` must be whitelisted.
+    - `account` must not be blacklisted.
+    - `account` must not already hold a token.
+  - **Returns**: `uint256` - The ID of the minted token.
+
+- **`batchMintAsAdmin(address[] calldata accounts)`**
+
+  - **Description**: Allows an admin to mint tokens to multiple addresses in a single transaction.
+  - **Requirements**:
+    - Caller must be an admin.
+    - `accounts` array must not be empty.
+    - For each address: same checks as `mintAsAdmin`.
+  - **Returns**: `uint256[]` - Array of minted token IDs.
+
+- **`mintAsWhitelisted()`**
+  - **Description**: Allows a whitelisted address to mint a token for themselves.
+  - **Requirements**:
+    - Whitelist must be enabled.
+    - Caller must be whitelisted.
+    - Caller must not be blacklisted.
+    - Caller must not already hold a token.
+  - **Returns**: `uint256` - The ID of the minted token.
+
+### Whitelist Management
+
+- **`addToWhitelist(address account)`**
+
+  - **Description**: Adds an address to the whitelist.
+  - **Requirements**:
+    - Caller must be an admin.
+    - `account` must not be the zero address.
+    - `account` must not already be whitelisted.
+    - `account` must not be blacklisted.
+
+- **`batchAddToWhitelist(address[] calldata accounts)`**
+
+  - **Description**: Adds multiple addresses to the whitelist.
+  - **Requirements**:
+    - Caller must be an admin.
+    - `accounts` array must not be empty.
+    - For each address: same checks as `addToWhitelist`.
+
+- **`removeFromWhitelist(address account)`**
+
+  - **Description**: Removes an address from the whitelist.
+  - **Requirements**:
+    - Caller must be an admin.
+    - `account` must be whitelisted.
+
+- **`batchRemoveFromWhitelist(address[] calldata accounts)`**
+
+  - **Description**: Removes multiple addresses from the whitelist.
+  - **Requirements**:
+    - Caller must be an admin.
+    - `accounts` array must not be empty.
+    - Each address must be whitelisted.
+
+- **`setWhitelistEnabled(bool whitelistEnabled)`**
+  - **Description**: Enables or disables the whitelist.
+  - **Requirements**:
+    - Caller must be an admin.
+    - New status must differ from the current status.
+
+### Blacklist Management
+
+- **`addToBlacklist(address account)`**
+
+  - **Description**: Adds an address to the blacklist, burning any token they hold and removing them from the whitelist if applicable.
+  - **Requirements**:
+    - Caller must be an admin.
+    - `account` must not be the zero address.
+    - `account` must not already be blacklisted.
+
+- **`batchAddToBlacklist(address[] calldata accounts)`**
+
+  - **Description**: Adds multiple addresses to the blacklist.
+  - **Requirements**:
+    - Caller must be an admin.
+    - `accounts` array must not be empty.
+    - For each address: same checks as `addToBlacklist`.
+
+- **`removeFromBlacklist(address account)`**
+
+  - **Description**: Removes an address from the blacklist.
+  - **Requirements**:
+    - Caller must be an admin.
+    - `account` must be blacklisted.
+
+- **`batchRemoveFromBlacklist(address[] calldata accounts)`**
+  - **Description**: Removes multiple addresses from the blacklist.
+  - **Requirements**:
+    - Caller must be an admin.
+    - `accounts` array must not be empty.
+    - Each address must be blacklisted.
 
 ### Assign/Revoke Admin
 
-- `setAdmin(address,bool)` - _onlyOwner_
-  - owner passes an address and a bool indicating whether that address is an admin or not
-- `batchSetAdmin(address[] memory,bool)` - _onlyOwner_
-  - owner passes an array of addresses and a bool indicating whether those addresses are admins or not
+- **`setAdmin(address account, bool isAdmin)`**
+
+  - **Description**: Sets the admin status for an address (assigns or revokes admin role).
+  - **Requirements**:
+    - Caller must be the owner.
+    - `account`’s admin status must not already be set to `isAdmin`.
+
+- **`batchSetAdmin(address[] calldata accounts, bool isAdmin)`**
+  - **Description**: Sets the admin status for multiple addresses.
+  - **Requirements**:
+    - Caller must be the owner.
+    - `accounts` array must not be empty.
+    - For each address: same checks as `setAdmin`.
 
 ### Base URI
 
-- `setBaseURI(string memory)` - _onlyOwner_
-  - owner passes a string to set the base URI for the token metadata
+- **`setBaseURI(string memory baseURI)`**
+  - **Description**: Sets the base URI for token metadata.
+  - **Requirements**:
+    - Caller must be the owner.
+  - **Note**:
+    - This could be a Terms of Service on IPFS.
+
+## Usage
+
+1. **Deployment**:
+
+   - Deploy the contract with:
+     - `name`: The token name (e.g., "SoulBoundToken").
+     - `symbol`: The token symbol (e.g., "SBT").
+     - `baseURI`: The base URI for token metadata (e.g., "https://ipfs.io/ipfs/<CID>/").
+     - `whitelistEnabled`: Initial whitelist status (`true` or `false`).
+   - The deployer becomes the initial owner.
+
+2. **Owner Setup**:
+
+   - Assign admin roles using `setAdmin` or `batchSetAdmin`.
+   - Optionally, update the `baseURI` with `setBaseURI`.
+
+3. **Admin Actions**:
+
+   - Manage the whitelist with `addToWhitelist`, `batchAddToWhitelist`, `removeFromWhitelist`, or `batchRemoveFromWhitelist`.
+   - Manage the blacklist with `addToBlacklist`, `batchAddToBlacklist`, `removeFromBlacklist`, or `batchRemoveFromBlacklist`.
+   - Toggle the whitelist status with `setWhitelistEnabled`.
+   - Mint tokens using `mintAsAdmin` or `batchMintAsAdmin`.
+
+4. **Whitelisted Users**:
+   - If the whitelist is enabled, whitelisted users can call `mintAsWhitelisted` to mint a token for themselves (assuming they are not blacklisted and do not already hold a token).
+
+## Testing
+
+Run `forge install` to install dependencies.
+
+See coverage with `forge coverage` and `forge coverage --report debug`.
+
+For unit tests run:
+
+```
+forge test --mt test_sbt
+```
+
+For invariant tests run:
+
+```
+forge test --mt invariant
+```
+
+## Formal Verification
+
+This project uses [Certora](https://docs.certora.com/en/latest/) for formal verification.
+
+To run the specification, first export your Certora prover key, and then run the configuration file:
+
+```
+export CERTORAKEY=<YOUR_KEY_HERE>
+certoraRun ./certora/conf/SoulBoundToken.conf
+```
+
+## Important Notes
+
+- **Non-transferrable Tokens**: Tokens cannot be transferred. Attempts to call `transferFrom`, `approve`, or `setApprovalForAll` will revert with `SoulBoundToken__TransferNotAllowed` or `SoulBoundToken__ApprovalNotAllowed`.
+- **Blacklisting Effects**: Adding an address to the blacklist burns any token they hold and removes them from the whitelist if applicable. Blacklisted addresses cannot be whitelisted or minted new tokens.
+- **Token Limits**: Each address can hold at most one token. Attempts to mint to an address that already holds a token will revert with `SoulBoundToken__AlreadyMinted`.
+- **Token IDs**: Token IDs start at 1 and increment sequentially with each mint.
+- **Error Handling**: Functions include detailed revert conditions (e.g., zero address checks, duplicate status checks) to ensure robust and secure operation.
 
 ## Comments on Design Choices
 
-The `addToWhitelist(address)` and `removeFromWhitelist(address)` functions could be combined into a `setWhitelist(address,bool)`, but have been separated in the interest of simplicity and readability. The same can be said for the batch add/remove and blacklist equivalents.
+- **Separate Add/Remove Functions**: Functions like `addToWhitelist` and `removeFromWhitelist` are separate rather than combined into a single `setWhitelist(address, bool)` function. This design choice prioritizes simplicity and readability over a more compact but less intuitive interface. The same applies to blacklist and batch equivalents.
+- **Token ID Management**: The `_incrementTokenIdCounter` function optimizes storage reads and writes during batch minting.
+
+## License
+
+This project is licensed under the MIT License.
