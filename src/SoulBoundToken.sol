@@ -98,6 +98,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @dev Revert if account is not whitelisted when whitelist is enabled
     /// @dev Revert if account is blacklisted
     /// @dev Revert if account already holds a token
+    /// @notice ERC721 reverts if account == zero address
     /// @notice This function is only callable by the contract admins
     function mintAsAdmin(address account) external onlyAdmin returns (uint256) {
         return _mintAsAdmin(account);
@@ -110,6 +111,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @dev Revert if any of the accounts are not whitelisted when whitelist is enabled
     /// @dev Revert if any of the accounts are blacklisted
     /// @dev Revert if any of the accounts already hold a token
+    /// @notice ERC721 reverts if any of the accounts == zero address
     /// @notice This function is only callable by the contract admins
     function batchMintAsAdmin(address[] calldata accounts) external onlyAdmin returns (uint256[] memory) {
         _revertIfEmptyArray(accounts);
