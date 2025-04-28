@@ -17,6 +17,12 @@ contract SetAdminTest is BaseTest {
         sbt.setAdmin(admin, true);
     }
 
+    function test_sbt_setAdmin_revertsWhen_zeroAddress() public {
+        _changePrank(owner);
+        vm.expectRevert(abi.encodeWithSignature("SoulBoundToken__NoZeroAddress()"));
+        sbt.setAdmin(address(0), true);
+    }
+
     function test_sbt_setAdmin_success() public {
         _changePrank(owner);
         sbt.setAdmin(user, true);

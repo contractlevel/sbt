@@ -880,6 +880,14 @@ rule setAdmin_revertsWhen_alreadySet() {
     assert lastReverted;
 }
 
+rule setAdmin_revertsWhen_zeroAddress() {
+    env e;
+    bool isAdmin;
+    require getAdmin(e.msg.sender);
+    setAdmin@withrevert(e, 0, isAdmin);
+    assert lastReverted;
+}
+
 rule setAdmin_success() {
     env e;
     address a;
@@ -904,6 +912,16 @@ rule batchSetAdmin_revertsWhen_emptyArray() {
     bool isAdmin;
     require a.length == 0;
     require e.msg.sender == owner();
+    batchSetAdmin@withrevert(e, a, isAdmin);
+    assert lastReverted;
+}
+
+rule batchSetAdmin_revertsWhen_zeroAddress() {
+    env e;
+    address[] a;
+    bool isAdmin;
+    require a[0] == 0;
+    require getAdmin(e.msg.sender);
     batchSetAdmin@withrevert(e, a, isAdmin);
     assert lastReverted;
 }

@@ -201,6 +201,7 @@ Below are the external functions that modify the contract's state:
   - **Requirements**:
     - Caller must be the owner.
     - `account`’s admin status must not already be set to `isAdmin`.
+    - `account` must not be the zero address.
 
 - **`batchSetAdmin(address[] calldata accounts, bool isAdmin)`**
   - **Description**: Sets the admin status for multiple addresses.

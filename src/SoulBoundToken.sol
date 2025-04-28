@@ -393,7 +393,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @param account The address to set the admin status for
     /// @param isAdmin The admin status to set
     function _setAdmin(address account, bool isAdmin) internal {
-        // @review - do we want zero address check here?
+        _revertIfZeroAddress(account);
         if (s_admins[account] == isAdmin) revert SoulBoundToken__AdminStatusAlreadySet(account, isAdmin);
         s_admins[account] = isAdmin;
         emit AdminStatusSet(account, isAdmin);
