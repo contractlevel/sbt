@@ -2,7 +2,8 @@
 pragma solidity 0.8.24;
 
 import {Test, Vm, console2} from "forge-std/Test.sol";
-import {DeploySoulBoundToken, SbtTermsAndFees, HelperConfig} from "../script/DeploySoulBoundToken.s.sol";
+import {DeploySoulBoundToken, SoulBoundToken, HelperConfig} from "../script/DeploySoulBoundToken.s.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 contract BaseTest is Test {
     /*//////////////////////////////////////////////////////////////
@@ -12,7 +13,7 @@ contract BaseTest is Test {
     uint256 internal constant OPTIMISM_MAINNET_STARTING_BLOCK = 134098035;
     uint256 internal optimismFork;
 
-    SbtTermsAndFees internal sbt;
+    SoulBoundToken internal sbt;
     HelperConfig internal config;
     string internal name;
     string internal symbol;
@@ -20,7 +21,8 @@ contract BaseTest is Test {
     bool internal whitelistEnabled;
     address internal nativeUsdFeed;
 
-    address internal owner = makeAddr("owner");
+    address internal owner;
+    uint256 internal ownerPk;
     address internal admin = makeAddr("admin");
     address internal notOwner = makeAddr("notOwner");
     address internal notAdmin = makeAddr("notAdmin");
@@ -28,7 +30,8 @@ contract BaseTest is Test {
     address internal notBlacklisted = makeAddr("notBlacklisted");
     address internal blacklisted = makeAddr("blacklisted");
     address internal whitelisted = makeAddr("whitelisted");
-    address internal user = makeAddr("user");
+    address internal user;
+    uint256 internal userPk;
     address internal user2 = makeAddr("user2");
     address[] internal accounts;
 
@@ -36,6 +39,9 @@ contract BaseTest is Test {
                                  SET UP
     //////////////////////////////////////////////////////////////*/
     function setUp() public virtual {
+        (owner, ownerPk) = makeAddrAndKey("owner");
+        (user, userPk) = makeAddrAndKey("user");
+
         _forkOptimism();
         _deployInfra();
 
@@ -104,5 +110,16 @@ contract BaseTest is Test {
     function _whitelistEnabled(bool isEnabled) internal {
         _changePrank(admin);
         sbt.setWhitelistEnabled(isEnabled);
+    }
+
+    function _createSignature(address signer, uint256 signerKey, bytes32 termsHash)
+        internal
+        pure
+        returns (bytes memory)
+    {
+        bytes32 messageHash = keccak256(abi.encodePacked(termsHash, signer));
+        bytes32 ethSignedMessageHash = MessageHashUtils.toEthSignedMessageHash(messageHash);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, ethSignedMessageHash);
+        return abi.encodePacked(r, s, v);
     }
 }

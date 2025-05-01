@@ -3,19 +3,19 @@ pragma solidity 0.8.24;
 
 import {Script} from "forge-std/Script.sol";
 import {HelperConfig} from "./HelperConfig.s.sol";
-import {SbtTermsAndFees} from "../src/extensions/SbtTermsAndFees.sol";
+import {SoulBoundToken} from "../src/SoulBoundToken.sol";
 
 contract DeploySoulBoundToken is Script {
     /*//////////////////////////////////////////////////////////////
                                   RUN
     //////////////////////////////////////////////////////////////*/
-    function run() public returns (SbtTermsAndFees, HelperConfig) {
+    function run() public returns (SoulBoundToken, HelperConfig) {
         HelperConfig config = new HelperConfig();
         (string memory name, string memory symbol, string memory baseURI, bool whitelistEnabled, address nativeUsdFeed)
         = config.activeNetworkConfig();
 
         vm.startBroadcast();
-        SbtTermsAndFees sbt = new SbtTermsAndFees(name, symbol, baseURI, whitelistEnabled, nativeUsdFeed);
+        SoulBoundToken sbt = new SoulBoundToken(name, symbol, baseURI, whitelistEnabled, nativeUsdFeed);
         vm.stopBroadcast();
         return (sbt, config);
     }
