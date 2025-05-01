@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import {Test, Vm, console2} from "forge-std/Test.sol";
-import {DeploySoulBoundToken, SoulBoundToken} from "../script/DeploySoulBoundToken.s.sol";
+import {DeploySoulBoundToken, SbtTermsAndFees, HelperConfig} from "../script/DeploySoulBoundToken.s.sol";
 
 contract BaseTest is Test {
     /*//////////////////////////////////////////////////////////////
@@ -12,11 +12,13 @@ contract BaseTest is Test {
     uint256 internal constant OPTIMISM_MAINNET_STARTING_BLOCK = 134098035;
     uint256 internal optimismFork;
 
-    SoulBoundToken internal sbt;
+    SbtTermsAndFees internal sbt;
+    HelperConfig internal config;
     string internal name;
     string internal symbol;
     string internal baseURI;
     bool internal whitelistEnabled;
+    address internal nativeUsdFeed;
 
     address internal owner = makeAddr("owner");
     address internal admin = makeAddr("admin");
@@ -61,10 +63,10 @@ contract BaseTest is Test {
     function _deployInfra() internal {
         /// @dev run deploy script
         DeploySoulBoundToken deploy = new DeploySoulBoundToken();
-        sbt = deploy.run();
+        (sbt, config) = deploy.run();
 
         /// @dev fetch args passed in constructor by deploy script
-        (name, symbol, baseURI, whitelistEnabled) = deploy.getDeployArgs();
+        (name, symbol, baseURI, whitelistEnabled, nativeUsdFeed) = config.activeNetworkConfig();
 
         /// @dev store owner
         _changePrank(sbt.owner());

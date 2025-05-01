@@ -11,5 +11,6 @@ contract ConstructorTest is BaseTest {
         assertEq(whitelistEnabled, sbt.getWhitelistEnabled());
         assertEq(sbt.getTokenIdCounter(), 1);
         assertEq(sbt.owner(), owner);
+        assertEq(nativeUsdFeed, sbt.getNativeUsdFeed());
     }
 }

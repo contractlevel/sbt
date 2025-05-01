@@ -2,31 +2,21 @@
 pragma solidity 0.8.24;
 
 import {Script} from "forge-std/Script.sol";
-import {SoulBoundToken} from "../src/SoulBoundToken.sol";
+import {HelperConfig} from "./HelperConfig.s.sol";
+import {SbtTermsAndFees} from "../src/extensions/SbtTermsAndFees.sol";
 
 contract DeploySoulBoundToken is Script {
     /*//////////////////////////////////////////////////////////////
-                               VARIABLES
-    //////////////////////////////////////////////////////////////*/
-    string constant NAME = "name";
-    string constant SYMBOL = "symbol";
-    string constant BASE_URI = "";
-    bool constant WHITELIST_ENABLED = true;
-
-    /*//////////////////////////////////////////////////////////////
                                   RUN
     //////////////////////////////////////////////////////////////*/
-    function run() public returns (SoulBoundToken) {
-        vm.startBroadcast();
-        SoulBoundToken sbt = new SoulBoundToken(NAME, SYMBOL, BASE_URI, WHITELIST_ENABLED);
-        vm.stopBroadcast();
-        return sbt;
-    }
+    function run() public returns (SbtTermsAndFees, HelperConfig) {
+        HelperConfig config = new HelperConfig();
+        (string memory name, string memory symbol, string memory baseURI, bool whitelistEnabled, address nativeUsdFeed)
+        = config.activeNetworkConfig();
 
-    /*//////////////////////////////////////////////////////////////
-                                 GETTER
-    //////////////////////////////////////////////////////////////*/
-    function getDeployArgs() external pure returns (string memory, string memory, string memory, bool) {
-        return (NAME, SYMBOL, BASE_URI, WHITELIST_ENABLED);
+        vm.startBroadcast();
+        SbtTermsAndFees sbt = new SbtTermsAndFees(name, symbol, baseURI, whitelistEnabled, nativeUsdFeed);
+        vm.stopBroadcast();
+        return (sbt, config);
     }
 }

@@ -1,24 +1,26 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {SoulBoundToken} from "../SoulBoundToken.sol";
+import {SoulBoundToken, ISoulBoundToken} from "../SoulBoundToken.sol";
+import {ISbtTermsAndFees} from "../interfaces/ISbtTermsAndFees.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
-import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
-/// @title SoulBoundToken with Terms of Service
+/// @title SoulBoundToken with Terms of Service and Fees
 /// @author @contractlevel
 /// @notice This contract is an extension of SoulBoundToken
-/// @notice Non-whitelisted users can mint tokens if they sign a message agreeing with Terms of Service
-contract SbtWithTerms is SoulBoundToken {
+/// @notice Non-whitelisted users can mint tokens if they sign a message agreeing with Terms of Service and pay a fee
+contract SbtTermsAndFees is SoulBoundToken, ISbtTermsAndFees {
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
-    error SbtWithTerms__WhitelistEnabled();
-    error SbtWithTerms__InvalidSignature();
-    error SbtWithTerms__InsufficientFee();
-    error SbtWithTerms__WithdrawFailed();
+    error SbtTermsAndFees__WhitelistEnabled();
+    error SbtTermsAndFees__InvalidSignature();
+    error SbtTermsAndFees__InsufficientFee();
+    error SbtTermsAndFees__WithdrawFailed();
+    error SbtTermsAndFees__NoZeroValue();
+    error SbtTermsAndFees__InsufficientBalance();
 
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
@@ -69,10 +71,10 @@ contract SbtWithTerms is SoulBoundToken {
     /// @dev Revert if msg.sender already holds a token
     function mintWithTerms(bytes memory signature) external payable returns (uint256 tokenId) {
         _revertIfInsufficientFee();
-        if (s_whitelistEnabled) revert SbtWithTerms__WhitelistEnabled();
+        if (s_whitelistEnabled) revert SbtTermsAndFees__WhitelistEnabled();
 
         bytes32 termsHash = s_termsHash;
-        if (!_verifySignature(signature, termsHash)) revert SbtWithTerms__InvalidSignature();
+        if (!_verifySignature(signature, termsHash)) revert SbtTermsAndFees__InvalidSignature();
 
         _revertIfAlreadyMinted(msg.sender);
 
@@ -82,13 +84,18 @@ contract SbtWithTerms is SoulBoundToken {
     }
 
     // @review - should we be overriding mintAsWhitelisted() and requiring a fee?
+    // yes.
 
-    /// @notice Admin only function for withdrawing fees
+    /// @notice Owner only function for withdrawing fees
     /// @param amountToWithdraw The amount of address(this).balance to withdraw
-    /// @dev Revert if caller is not admin
-    function withdrawFees(uint256 amountToWithdraw) external onlyAdmin {
+    /// @dev Revert if caller is not owner
+    /// @dev Revert if amountToWithdraw is 0
+    /// @dev Revert if amountToWithdraw is more than contract balance
+    function withdrawFees(uint256 amountToWithdraw) external onlyOwner {
+        if (amountToWithdraw == 0) revert SbtTermsAndFees__NoZeroValue();
+        if (amountToWithdraw > address(this).balance) revert SbtTermsAndFees__InsufficientBalance();
         (bool success,) = payable(msg.sender).call{value: amountToWithdraw}("");
-        if (!success) revert SbtWithTerms__WithdrawFailed();
+        if (!success) revert SbtTermsAndFees__WithdrawFailed();
         emit FeesWithdrawn(msg.sender, amountToWithdraw);
     }
 
@@ -107,6 +114,9 @@ contract SbtWithTerms is SoulBoundToken {
         bytes32 ethSignedMessageHash = MessageHashUtils.toEthSignedMessageHash(messageHash);
 
         /// @dev attempt to recover the signer
+        // SbtTermsAndFees._verifySignature(bytes,bytes32) (src/extensions/SbtTermsAndFees.sol#102-115) ignores return value
+        // by (recovered,error,None) = ECDSA.tryRecover(ethSignedMessageHash,signature) (src/extensions/SbtTermsAndFees.sol#110)
+        // Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#unused-return
         (address recovered, ECDSA.RecoverError error,) = ECDSA.tryRecover(ethSignedMessageHash, signature);
 
         /// @dev return false if errors or incorrect signer
@@ -121,7 +131,7 @@ contract SbtWithTerms is SoulBoundToken {
     }
 
     function _revertIfInsufficientFee() internal view {
-        if (msg.value < _getFee()) revert SbtWithTerms__InsufficientFee();
+        if (msg.value < _getFee()) revert SbtTermsAndFees__InsufficientFee();
     }
 
     /// @dev returns the latest native/USD price
@@ -143,7 +153,7 @@ contract SbtWithTerms is SoulBoundToken {
     //////////////////////////////////////////////////////////////*/
     /// @dev Sets the base URI for token metadata
     /// @param baseURI New base URI
-    function setBaseURI(string memory baseURI) external override onlyOwner {
+    function setBaseURI(string memory baseURI) external override(SoulBoundToken, ISoulBoundToken) onlyOwner {
         _setBaseURI(baseURI);
         _hashTerms(baseURI);
     }
@@ -151,6 +161,7 @@ contract SbtWithTerms is SoulBoundToken {
     /// @dev Sets the factor used for calculating the fee
     /// @param newFeeFactor the new factor value used for calculating the fee
     /// @notice This is an admin only function
+    /// @dev This value should be in USD with 18 decimals. ie 1 USD = 1e18 (1000000000000000000)
     function setFeeFactor(uint256 newFeeFactor) external onlyAdmin {
         s_feeFactor = newFeeFactor;
         emit FeeFactorSet(msg.sender, newFeeFactor);
@@ -167,5 +178,9 @@ contract SbtWithTerms is SoulBoundToken {
     /// @return termsHash This is a hash of the base URI which should be used when signing a message to mintWithTerms()
     function getTermsHash() external view returns (bytes32) {
         return s_termsHash;
+    }
+
+    function getNativeUsdFeed() external view returns (address) {
+        return address(i_nativeUsdFeed);
     }
 }
