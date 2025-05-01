@@ -10,7 +10,8 @@ import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/Messa
 /// @title SoulBoundToken with Terms of Service and Fees
 /// @author @contractlevel
 /// @notice This contract is an extension of SoulBoundToken
-/// @notice Non-whitelisted users can mint tokens if they sign a message agreeing with Terms of Service and pay a fee
+/// @notice Non-whitelisted users can mint tokens if they sign a message agreeing with Terms of Service
+/// @notice Fees are enforced on all user mints, and set by admins
 contract SbtTermsAndFees is SoulBoundToken, ISbtTermsAndFees {
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
