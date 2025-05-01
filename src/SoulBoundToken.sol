@@ -131,7 +131,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @dev Revert if whitelist is disabled
     /// @dev Revert if msg.sender is not whitelisted
     /// @dev Revert if msg.sender already holds a token
-    function mintAsWhitelisted() external returns (uint256) {
+    function mintAsWhitelisted() external virtual returns (uint256) {
         if (!_isWhitelistEnabled()) revert SoulBoundToken__WhitelistDisabled();
         _revertIfNotWhitelisted(msg.sender);
         _revertIfAlreadyMinted(msg.sender);
@@ -406,7 +406,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     //////////////////////////////////////////////////////////////*/
     /// @dev Sets the base URI for token metadata
     /// @param baseURI New base URI
-    function setBaseURI(string memory baseURI) external onlyOwner {
+    function setBaseURI(string memory baseURI) external virtual onlyOwner {
         _setBaseURI(baseURI);
     }
 
