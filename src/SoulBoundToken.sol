@@ -88,6 +88,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     event FeeCollected(address indexed user, uint256 amount, uint256 tokenId);
     event FeesWithdrawn(address indexed admin, uint256 amount);
     event FeeFactorSet(uint256 feeFactor);
+    event SignatureVerified(address indexed signer, bytes signature);
 
     /*//////////////////////////////////////////////////////////////
                                MODIFIERS
@@ -182,11 +183,11 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @dev Revert if msg.sender already holds a token
     function mintWithTerms(bytes memory signature) external payable returns (uint256 tokenId) {
         _revertIfInsufficientFee();
-        if (s_whitelistEnabled) revert SoulBoundToken__WhitelistEnabled();
+        if (_isWhitelistEnabled()) revert SoulBoundToken__WhitelistEnabled();
+        _revertIfAlreadyMinted(msg.sender);
 
         if (!_verifySignature(signature)) revert SoulBoundToken__InvalidSignature();
-
-        _revertIfAlreadyMinted(msg.sender);
+        else emit SignatureVerified(msg.sender, signature);
 
         tokenId = _mintSoulBoundToken(msg.sender);
 

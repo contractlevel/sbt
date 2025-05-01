@@ -32,7 +32,8 @@ contract BaseTest is Test {
     address internal whitelisted = makeAddr("whitelisted");
     address internal user;
     uint256 internal userPk;
-    address internal user2 = makeAddr("user2");
+    address internal user2;
+    uint256 internal user2Pk;
     address[] internal accounts;
 
     /*//////////////////////////////////////////////////////////////
@@ -41,6 +42,7 @@ contract BaseTest is Test {
     function setUp() public virtual {
         (owner, ownerPk) = makeAddrAndKey("owner");
         (user, userPk) = makeAddrAndKey("user");
+        (user2, user2Pk) = makeAddrAndKey("user2");
 
         _forkOptimism();
         _deployInfra();
