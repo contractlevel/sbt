@@ -6,12 +6,6 @@ import {MockV3Aggregator} from "../test/mocks/MockV3Aggregator.sol";
 
 contract HelperConfig is Script {
     /*//////////////////////////////////////////////////////////////
-                               VARIABLES
-    //////////////////////////////////////////////////////////////*/
-    uint8 constant DECIMALS = 8;
-    int256 constant INITIAL_ANSWER = 2000 * 1e8; // $2000/ETH
-
-    /*//////////////////////////////////////////////////////////////
                              NETWORK CONFIG
     //////////////////////////////////////////////////////////////*/
     struct NetworkConfig {
@@ -39,19 +33,21 @@ contract HelperConfig is Script {
         return NetworkConfig({
             name: "Evo Labs SoulBoundToken", // review format
             symbol: "EVO",
-            baseURI: "ipfs://QmfKN2Cq3HSNXVr36MXHdRMvH2PDrby3y1cH1aRFbTkf4C", // dummy value, replace in production
+            baseURI: "ipfs://QmfKN2Cq3HSNXVr36MXHdRMvH2PDrby3y1cH1aRFbTkf4C/", // dummy value, replace in production
             whitelistEnabled: true,
             nativeUsdFeed: 0xb7B9A39CC63f856b90B364911CC324dC46aC1770 // https://docs.chain.link/data-feeds/price-feeds/addresses?page=1&network=optimism&search=eth
         });
     }
 
     function getOrCreateAnvilEthConfig() public returns (NetworkConfig memory) {
-        MockV3Aggregator mockPriceFeed = new MockV3Aggregator(DECIMALS, INITIAL_ANSWER);
+        uint8 decimals = 8;
+        int256 initialAnswer = 2000 * 1e8; // $2000/ETH
+        MockV3Aggregator mockPriceFeed = new MockV3Aggregator(decimals, initialAnswer);
 
         return NetworkConfig({
             name: "Evo Labs SoulBoundToken", // review format
             symbol: "EVO",
-            baseURI: "ipfs://QmfKN2Cq3HSNXVr36MXHdRMvH2PDrby3y1cH1aRFbTkf4C", // dummy value, replace in production
+            baseURI: "ipfs://QmfKN2Cq3HSNXVr36MXHdRMvH2PDrby3y1cH1aRFbTkf4C/", // dummy value, replace in production
             whitelistEnabled: true,
             nativeUsdFeed: address(mockPriceFeed)
         });

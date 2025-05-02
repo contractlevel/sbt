@@ -21,8 +21,7 @@ contract BaseTest is Test {
     bool internal whitelistEnabled;
     address internal nativeUsdFeed;
 
-    address internal owner;
-    uint256 internal ownerPk;
+    address internal owner = makeAddr("owner");
     address internal admin = makeAddr("admin");
     address internal notOwner = makeAddr("notOwner");
     address internal notAdmin = makeAddr("notAdmin");
@@ -40,7 +39,6 @@ contract BaseTest is Test {
                                  SET UP
     //////////////////////////////////////////////////////////////*/
     function setUp() public virtual {
-        (owner, ownerPk) = makeAddrAndKey("owner");
         (user, userPk) = makeAddrAndKey("user");
         (user2, user2Pk) = makeAddrAndKey("user2");
 

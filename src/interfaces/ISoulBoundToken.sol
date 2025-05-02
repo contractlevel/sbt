@@ -22,7 +22,6 @@ interface ISoulBoundToken is IERC721Enumerable {
     function getWhitelistEnabled() external view returns (bool);
     function getBaseURI() external view returns (string memory);
     function getTokenIdCounter() external view returns (uint256);
-
     function mintWithTerms(bytes memory signature) external payable returns (uint256 tokenId);
     function withdrawFees(uint256 amountToWithdraw) external;
     function setFeeFactor(uint256 newFeeFactor) external;
