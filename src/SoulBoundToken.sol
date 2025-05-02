@@ -182,6 +182,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @dev Revert if msg.sender already holds a token
     function mintWithTerms(bytes memory signature) external payable returns (uint256 tokenId) {
         _revertIfInsufficientFee();
+        _revertIfBlacklisted(msg.sender);
         if (_isWhitelistEnabled()) revert SoulBoundToken__WhitelistEnabled();
         _revertIfAlreadyMinted(msg.sender);
 

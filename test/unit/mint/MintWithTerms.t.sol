@@ -12,6 +12,14 @@ contract MintWithTermsTest is BaseTest {
         sbt.mintWithTerms(signature);
     }
 
+    function test_sbt_mintWithTerms_revertsWhen_blacklisted() public {
+        bytes memory signature = _createSignature(user, userPk, sbt.getTermsHash());
+
+        _changePrank(blacklisted);
+        vm.expectRevert(abi.encodeWithSignature("SoulBoundToken__Blacklisted(address)", blacklisted));
+        sbt.mintWithTerms(signature);
+    }
+
     function test_sbt_mintWithTerms_revertsWhen_insufficientFee() public {
         uint256 fee = _setFeeFactorAndDealFee(1e18, user);
 
