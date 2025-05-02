@@ -66,6 +66,28 @@ contract Invariant is StdInvariant, BaseTest {
         assertEq(sbt.balanceOf(blacklisted), 0, "Invariant violated: Blacklisted account should not hold the token.");
     }
 
+    // No blacklisted account should be whitelisted
+    function invariant_blacklisted_not_whitelisted() public {
+        handler.forEachBlacklisted(this.checkBlacklistedNotWhitelisted);
+    }
+
+    function checkBlacklistedNotWhitelisted(address blacklisted) external view {
+        assertTrue(
+            !sbt.getWhitelisted(blacklisted), "Invariant violated: Blacklisted account should not be whitelisted."
+        );
+    }
+
+    // No whitelisted account should be blacklisted
+    function invariant_whitelisted_not_blacklisted() public {
+        handler.forEachWhitelisted(this.checkWhitelistedNotBlacklisted);
+    }
+
+    function checkWhitelistedNotBlacklisted(address whitelisted) external view {
+        assertTrue(
+            !sbt.getBlacklisted(whitelisted), "Invariant violated: Whitelisted account should not be blacklisted."
+        );
+    }
+
     // Holder should not have more than 1 token:
     // loop through all holders and assert balance is 1
     function invariant_holder_oneToken() public {
@@ -98,11 +120,20 @@ contract Invariant is StdInvariant, BaseTest {
     }
 
     // Fee Accountancy: SBT balance should equal (or be more than) total accumulated fees - total withdrawn
-    function invariant_feesAccountancy() public {
+    function invariant_feesAccountancy() public view {
         assertEq(
             address(sbt).balance,
             handler.g_totalFeesAccumulated() - handler.g_totalFeesWithdrawn(),
             "Invariant violated: SBT balance should be equal to total fees accumulated minus total withdrawn."
+        );
+    }
+
+    // Terms Hash: The terms hash should always be the hash of the baseURI
+    function invariant_termsHash_baseURI() public view {
+        assertEq(
+            sbt.getTermsHash(),
+            keccak256(abi.encodePacked(sbt.getBaseURI())),
+            "Invariant violated: Terms hash should be equal to the hash of the baseURI."
         );
     }
 }

@@ -526,12 +526,30 @@ contract Handler is Test {
     /*//////////////////////////////////////////////////////////////
                                 UTILITY
     //////////////////////////////////////////////////////////////*/
+    /// @dev helper function for looping through accounts in the system
+    function forEachAccount(function(address) external func) external {
+        if (accounts.length() == 0) return;
+
+        for (uint256 i; i < accounts.length(); ++i) {
+            func(accounts.at(i));
+        }
+    }
+
     /// @dev helper function for looping through holders in the system
     function forEachHolder(function(address) external func) external {
         if (holders.length() == 0) return;
 
         for (uint256 i; i < holders.length(); ++i) {
             func(holders.at(i));
+        }
+    }
+
+    /// @dev helper function for looping through whitelisted accounts in the system
+    function forEachWhitelisted(function(address) external func) external {
+        if (whitelisted.length() == 0) return;
+
+        for (uint256 i; i < whitelisted.length(); ++i) {
+            func(whitelisted.at(i));
         }
     }
 
@@ -543,13 +561,6 @@ contract Handler is Test {
             func(blacklisted.at(i));
         }
     }
-
-    // @review - probably delete this
-    // /// @dev convert a seed to an address
-    // function _seedToAddress(uint256 addressSeed) internal pure returns (address seedAddress) {
-    //     uint160 boundInt = uint160(bound(addressSeed, 1, type(uint160).max));
-    //     seedAddress = address(boundInt);
-    // }
 
     /// @dev convert a seed/private key to an address
     function _seedToAddress(uint256 privateKeySeed) internal returns (address) {
