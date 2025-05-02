@@ -107,6 +107,27 @@ contract Invariant is StdInvariant, BaseTest {
         );
     }
 
+    // Total supply should be equal to amount of holders
+    function invariant_totalSupply_equals_holders() public view {
+        assertEq(
+            sbt.totalSupply(),
+            handler.getHoldersLength(),
+            "Invariant violated: Total supply should equal the number of holders."
+        );
+    }
+
+    // Token IDs should be sequential, with gaps only for burns
+    function invariant_tokenIds_sequential() public view {
+        uint256 totalSupply = sbt.totalSupply();
+        for (uint256 i = 0; i < totalSupply; i++) {
+            uint256 tokenId = sbt.tokenByIndex(i);
+            assertTrue(
+                tokenId >= 1 && tokenId <= sbt.getTokenIdCounter() - 1,
+                "Invariant violated: Token ID out of expected range."
+            );
+        }
+    }
+
     // No approvals should exist:
     // loop through all tokens and assert that the token has no approved address
     function invariant_noApprovals() public view {
@@ -135,5 +156,10 @@ contract Invariant is StdInvariant, BaseTest {
             keccak256(abi.encodePacked(sbt.getBaseURI())),
             "Invariant violated: Terms hash should be equal to the hash of the baseURI."
         );
+    }
+
+    // Terms Hash: Should never be zero
+    function invariant_termsHash_nonZero() public view {
+        assertTrue(sbt.getTermsHash() != bytes32(0), "Invariant violated: Terms hash should never be zero.");
     }
 }
