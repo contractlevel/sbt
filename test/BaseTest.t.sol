@@ -124,4 +124,11 @@ contract BaseTest is Test {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, ethSignedMessageHash);
         return abi.encodePacked(r, s, v);
     }
+
+    function _setFeeFactorAndDealFee(uint256 feeFactor, address dealTo) internal returns (uint256 fee) {
+        _changePrank(admin);
+        sbt.setFeeFactor(feeFactor);
+        fee = sbt.getFee();
+        deal(dealTo, fee);
+    }
 }

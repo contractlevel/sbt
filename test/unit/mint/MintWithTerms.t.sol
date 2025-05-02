@@ -13,11 +13,9 @@ contract MintWithTermsTest is BaseTest {
     }
 
     function test_sbt_mintWithTerms_revertsWhen_insufficientFee() public {
-        sbt.setFeeFactor(1e18);
-        deal(user, 1e18);
+        uint256 fee = _setFeeFactorAndDealFee(1e18, user);
 
         bytes memory signature = _createSignature(user, userPk, sbt.getTermsHash());
-        uint256 fee = sbt.getFee();
 
         _changePrank(user);
         vm.expectRevert(abi.encodeWithSignature("SoulBoundToken__InsufficientFee()"));
@@ -52,10 +50,7 @@ contract MintWithTermsTest is BaseTest {
     }
 
     function test_sbt_mintWithTerms_success() public {
-        uint256 feeFactor = 1e18;
-        sbt.setFeeFactor(feeFactor);
-        uint256 fee = sbt.getFee();
-        deal(user, fee);
+        uint256 fee = _setFeeFactorAndDealFee(1e18, user);
 
         _whitelistEnabled(false);
         bytes32 termsHash = sbt.getTermsHash();

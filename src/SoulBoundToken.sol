@@ -86,7 +86,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     event AdminStatusSet(address indexed account, bool indexed isAdmin);
     event TermsHashed(bytes32 indexed hashedTerms, string baseURI);
     event FeeCollected(address indexed user, uint256 amount, uint256 tokenId);
-    event FeesWithdrawn(address indexed admin, uint256 amount);
+    event FeesWithdrawn(uint256 amount);
     event FeeFactorSet(uint256 feeFactor);
     event SignatureVerified(address indexed signer, bytes signature);
 
@@ -117,7 +117,6 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
         _setBaseURI(baseURI);
         _setWhitelistEnabled(whitelistEnabled);
         s_tokenIdCounter = 1;
-
         i_nativeUsdFeed = AggregatorV3Interface(nativeUsdFeed);
         _hashTerms(baseURI);
     }
@@ -311,7 +310,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
         if (amountToWithdraw > address(this).balance) revert SoulBoundToken__InsufficientBalance();
         (bool success,) = payable(msg.sender).call{value: amountToWithdraw}("");
         if (!success) revert SoulBoundToken__WithdrawFailed();
-        emit FeesWithdrawn(msg.sender, amountToWithdraw);
+        emit FeesWithdrawn(amountToWithdraw);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -592,6 +591,11 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @return nativeUsdFeed Chainlink price feed for native/USD used to calculate fee
     function getNativeUsdFeed() external view returns (address) {
         return address(i_nativeUsdFeed);
+    }
+
+    /// @return feeFactor The value set by admins to calculate fee price
+    function getFeeFactor() external view returns (uint256) {
+        return s_feeFactor;
     }
 
     /*//////////////////////////////////////////////////////////////
