@@ -490,12 +490,15 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
         return error == ECDSA.RecoverError.NoError && recovered == msg.sender;
     }
 
+    /// @param baseURI SBT base URI (intended to be IPFS resource)
+    /// @dev Hashes the baseURI and stores it
     function _hashTerms(string memory baseURI) internal {
         bytes32 hashedTerms = keccak256(abi.encodePacked(baseURI));
         s_termsHash = hashedTerms;
         emit TermsHashed(hashedTerms, baseURI);
     }
 
+    /// @dev reverts if msg.value is less than fee
     function _revertIfInsufficientFee() internal view {
         if (msg.value < _getFee()) revert SoulBoundToken__InsufficientFee();
     }
@@ -584,7 +587,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
         return _getFee();
     }
 
-    /// @return termsHash This is a hash of the base URI which should be used when signing a message to mintWithTerms()
+    /// @return termsHash This is a hash of the base URI which should be used when signing a message to mint with terms
     function getTermsHash() external view returns (bytes32) {
         return s_termsHash;
     }

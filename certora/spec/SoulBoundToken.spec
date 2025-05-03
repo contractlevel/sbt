@@ -17,9 +17,15 @@ methods {
     function getWhitelistEnabled() external returns (bool) envfree;
     function setWhitelistEnabled(bool) external;
     function getTokenIdCounter() external returns (uint256) envfree;
+    function getFee() external returns (uint256) envfree;
+
+    // Summaries
+    function _.latestRoundData() external => DISPATCHER(true);
+    function _.onERC721Received(address,address,uint256,bytes) external => DISPATCHER(true);
 
     // Harness helper functions
     function bytes32ToBool(bytes32) external returns (bool) envfree;
+    function getVerifiedSignature(bytes) external returns (bool);
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -29,7 +35,8 @@ methods {
 definition canMint(method f) returns bool = 
 	f.selector == sig:mintAsAdmin(address).selector || 
 	f.selector == sig:batchMintAsAdmin(address[]).selector ||
-    f.selector == sig:mintAsWhitelisted().selector;
+    f.selector == sig:mintAsWhitelisted().selector ||
+    f.selector == sig:mintWithTerms(bytes).selector;
 
 /// @notice external functions that can burn
 definition canBurn(method f) returns bool = 
@@ -48,13 +55,15 @@ definition onlyAdmin(method f) returns bool =
     f.selector == sig:removeFromBlacklist(address).selector ||
     f.selector == sig:batchRemoveFromBlacklist(address[]).selector ||
     f.selector == sig:mintAsAdmin(address).selector ||
-    f.selector == sig:batchMintAsAdmin(address[]).selector;
+    f.selector == sig:batchMintAsAdmin(address[]).selector ||
+    f.selector == sig:setFeeFactor(uint256).selector;
 
 /// @notice functions that can only be called by the owner
 definition onlyOwner(method f) returns bool = 
     f.selector == sig:setAdmin(address,bool).selector ||
     f.selector == sig:batchSetAdmin(address[],bool).selector ||
-    f.selector == sig:setBaseURI(string).selector;
+    f.selector == sig:setBaseURI(string).selector ||
+    f.selector == sig:withdrawFees(uint256).selector;
 
 /// @notice function that take an array of addresses as an argument
 definition batchFunction(method f) returns bool = 
@@ -69,6 +78,11 @@ definition batchFunction(method f) returns bool =
 definition canApprove(method f) returns bool =
     f.selector == sig:approve(address,uint256).selector ||
     f.selector == sig:setApprovalForAll(address,bool).selector;
+
+/// @notice functions that can take a fee
+definition canTakeFee(method f) returns bool =
+    f.selector == sig:mintAsWhitelisted().selector ||
+    f.selector == sig:mintWithTerms(bytes).selector;
 
 definition AddedToWhitelistEvent() returns bytes32 =
 // keccak256(abi.encodePacked("AddedToWhitelist(address)"))
@@ -93,6 +107,8 @@ definition UpdatedWhitelistEnabledEvent() returns bytes32 =
 definition AdminStatusSetEvent() returns bytes32 =
 // keccak256(abi.encodePacked("AdminStatusSet(address,bool)"))
     to_bytes32(0xa8c4c644eea5bad1029a340b24f332f16eeb8ca98e4cb0ce50df3083fc6d40b4);
+
+// add terms and fees events
 
 /*//////////////////////////////////////////////////////////////
                            FUNCTIONS
@@ -363,6 +379,10 @@ invariant blacklist_eventParams(address a)
 invariant admin_eventParams(address a)
     g_adminEventParams[a] == getAdmin(a);
 
+/// everytime contract balance changes, FeeCollected or FeesWithdrawn event should have been emitted
+
+/// ghosts for tracking fees accumulated and withdrawn 
+
 /*//////////////////////////////////////////////////////////////
                              RULES
 //////////////////////////////////////////////////////////////*/
@@ -444,6 +464,17 @@ rule approvals_alwaysRevert(method f) filtered {f -> canApprove(f)} {
     calldataarg args;
     f@withrevert(e, args);
     assert lastReverted;
+}
+
+rule feeCollection_increaseBalance(method f) filtered {f -> canTakeFee(f)} {
+    env e;
+    calldataarg args;
+    uint256 startBalance = nativeBalances[currentContract];
+
+    f(e, args);
+
+    assert balanceOf(e.msg.sender) == 1;
+    assert nativeBalances[currentContract] >= startBalance;
 }
 
 // ------------------------------------------------------------//
@@ -835,18 +866,20 @@ rule mintAsAdmin_success () {
 // --- mintAsWhitelisted --- //
 rule mintAsWhitelisted_revertsWhen_whitelistDisabled() {
     env e;
-    calldataarg args;
-    require !getWhitelistEnabled();
+    require e.msg.value >= getFee();
+    require getWhitelisted(e.msg.sender);
 
-    mintAsWhitelisted@withrevert(e, args);
+    require !getWhitelistEnabled();
+    mintAsWhitelisted@withrevert(e);
     assert lastReverted;
 }
 
 rule mintAsWhitelisted_revertsWhen_notWhitelisted() {
     env e;
     require getWhitelistEnabled();
-    require !getWhitelisted(e.msg.sender);
+    require e.msg.value >= getFee();
 
+    require !getWhitelisted(e.msg.sender);
     mintAsWhitelisted@withrevert(e);
     assert lastReverted;
 }
@@ -855,16 +888,92 @@ rule mintAsWhitelisted_revertsWhen_alreadyMinted() {
     env e;
     require getWhitelistEnabled();
     require getWhitelisted(e.msg.sender);
-    require balanceOf(e.msg.sender) > 0;
+    require e.msg.value >= getFee();
 
+    require balanceOf(e.msg.sender) > 0;
+    mintAsWhitelisted@withrevert(e);
+    assert lastReverted;
+}
+
+rule mintAsWhitelisted_revertsWhen_insufficientFee() {
+    env e;
+    require getWhitelistEnabled();
+    require getWhitelisted(e.msg.sender);
+
+    require e.msg.value < getFee();
     mintAsWhitelisted@withrevert(e);
     assert lastReverted;
 }
 
 rule mintAsWhitelisted_success() {
     env e;
+    uint256 startBalance = nativeBalances[currentContract];
+
     mintAsWhitelisted(e);
+
     assert balanceOf(e.msg.sender) == 1;
+    assert nativeBalances[currentContract] >= startBalance;
+}
+
+// --- mintWithTerms --- //
+rule mintWithTerms_revertsWhen_whitelistEnabled() {
+    env e;
+    calldataarg args;
+    require !getBlacklisted(e.msg.sender);
+    require e.msg.value >= getFee();
+
+    require getWhitelistEnabled();
+    mintWithTerms@withrevert(e, args);
+    assert lastReverted;
+}
+
+rule mintWithTerms_revertsWhen_blacklisted() {
+    env e;
+    calldataarg args;
+    require !getWhitelistEnabled();
+    require e.msg.value >= getFee();
+    
+    require getBlacklisted(e.msg.sender);
+    mintWithTerms@withrevert(e, args);
+    assert lastReverted;
+}
+
+rule mintWithTerms_revertsWhen_insufficientFee() {
+    env e;
+    calldataarg args;
+    require !getWhitelistEnabled();
+    require !getBlacklisted(e.msg.sender);
+    require getFee() > 0;
+    
+    require e.msg.value < getFee();
+    mintWithTerms@withrevert(e, args);
+    assert lastReverted;
+}
+
+rule mintWithTerms_revertsWhen_invalidSignature() {
+    env e;
+    bytes s;
+    require !getWhitelistEnabled();
+    require !getBlacklisted(e.msg.sender);
+    require getFee() > 0;
+    require e.msg.value >= getFee();
+
+    require !getVerifiedSignature(e, s);
+    mintWithTerms@withrevert(e, s);
+    assert lastReverted;
+}
+
+// can we access non-indexed event params like the bytes signature in certora? probably not
+
+rule mintWithTerms_success() {
+    env e;
+    bytes s;
+    uint256 startBalance = nativeBalances[currentContract];
+
+    mintWithTerms(e, s);
+
+    assert balanceOf(e.msg.sender) == 1;
+    assert nativeBalances[currentContract] >= startBalance;
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -935,3 +1044,11 @@ rule batchSetAdmin_success() {
 
     assert forall uint256 i. i < a.length => g_admins[a[i]] == isAdmin;
 }
+
+/*//////////////////////////////////////////////////////////////
+                         SET FEE FACTOR
+//////////////////////////////////////////////////////////////*/
+
+/*//////////////////////////////////////////////////////////////
+                         WITHDRAW FEES
+//////////////////////////////////////////////////////////////*/
