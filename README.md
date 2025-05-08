@@ -33,6 +33,8 @@ A SoulBoundToken contract for Optimism with administrative whitelist and blackli
     - [Non-admin/user mints](#non-adminuser-mints)
       - [Fee](#fee)
       - [Signature](#signature)
+    - [Fee Factor](#fee-factor)
+    - [getFee()](#getfee)
   - [License](#license)
 
 ## Features
@@ -339,6 +341,16 @@ keccak256(bytes.concat("\x19Ethereum Signed Message:\n", bytes(Strings.toString(
 ```
 
 ethers.js should probably be able to do this too. Consider double checking this bit with AI.
+
+### Fee Factor
+
+The `setFeeFactor(uint256 newFeeFactor)` takes a uint256 `newFeeFactor` as an argument. This value is used to calculate the fee for minting. Solidity has no decimal places and 18 decimals is standardly used so if you want to set the fee to be $1 in value, use `1000000000000000000` (18 0's).
+
+Similarly $0.50 would be `500000000000000000` (17 0's).
+
+### getFee()
+
+`getFee()` will also return a value with 18 decimal places, so if you are displaying the fee for a mint on the frontend, consider accounting for that. The currency will be in native/ETH.
 
 ## License
 
