@@ -27,6 +27,12 @@ A SoulBoundToken contract for Optimism with administrative whitelist and blackli
   - [Formal Verification](#formal-verification)
   - [Important Notes](#important-notes)
   - [Comments on Design Choices](#comments-on-design-choices)
+  - [Frontend Notes](#frontend-notes)
+    - [Libraries for connecting frontend to smart contract:](#libraries-for-connecting-frontend-to-smart-contract)
+    - [What is needed?](#what-is-needed)
+    - [Non-admin/user mints](#non-adminuser-mints)
+      - [Fee](#fee)
+      - [Signature](#signature)
   - [License](#license)
 
 ## Features
@@ -287,6 +293,52 @@ certoraRun ./certora/conf/SoulBoundToken.conf
 
 - **Separate Add/Remove Functions**: Functions like `addToWhitelist` and `removeFromWhitelist` are separate rather than combined into a single `setWhitelist(address, bool)` function. This design choice prioritizes simplicity and readability over a more compact but less intuitive interface. The same applies to blacklist and batch equivalents.
 - **Token ID Management**: The `_incrementTokenIdCounter` function optimizes storage reads and writes during batch minting.
+
+## Frontend Notes
+
+### Libraries for connecting frontend to smart contract:
+
+[ethers.js](https://docs.ethers.org/v6/) - this is the most popular and probably the best option.
+
+[web3.js](https://web3js.readthedocs.io/en/v1.10.0/) - there's also this one if you have issues with ethers.
+
+### What is needed?
+
+- deployed SBT contract address
+- probably rpc url for the blockchain network contract is deployed to
+- contract ABI (application binary interface) - this is like a JSON file with information about the contract's functions and is created when the contract is compiled. I can find it later
+
+### Non-admin/user mints
+
+#### Fee
+
+Users will have to pay a fee (if there is a fee) when minting a token. The fee can be retrieved from the contract's `getFee()` function (will return 0 if no fee) and should be passed as a `msg.value`.
+
+Fees apply to both `mintAsWhitelisted()` and `mintWithTerms()`.
+
+#### Signature
+
+`mintWithTerms()` takes a signature as an argument. The signature must be unique to the user/msg.sender.
+
+This is the logic in the contract for creating the signature:
+
+```
+/// @dev compute the message hash: keccak256(termsHash, msg.sender)
+bytes32 messageHash = keccak256(abi.encodePacked(s_termsHash, msg.sender));
+
+/// @dev apply Ethereum signed message prefix
+bytes32 ethSignedMessageHash = MessageHashUtils.toEthSignedMessageHash(messageHash);
+```
+
+The value of `s_termsHash` can be retrieved from `getTermsHash()`, so you want to take that value and the user's address and create a hash of that using `keccak256(abi.encodePacked())` - ethers.js should be able to do this. Let me know if you need more information.
+
+Then the hash that has been created with the `getTermsHash()` and user's address needs to be prefixed with a standard formatting thing for eth signatures. The logic in the library I've used looks like this:
+
+```
+keccak256(bytes.concat("\x19Ethereum Signed Message:\n", bytes(Strings.toString(message.length)), message));
+```
+
+ethers.js should probably be able to do this too. Consider double checking this bit with AI.
 
 ## License
 
