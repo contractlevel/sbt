@@ -63,6 +63,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     uint256 internal s_feeFactor;
     /// @dev Token counter for minting
     uint256 internal s_tokenIdCounter;
+    // @review replace this with s_contractURI;
     /// @dev Base URI for token metadata
     string internal s_baseURI;
     /// @dev Mapping for whitelist
@@ -127,7 +128,6 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @dev Mints a new token to the specified address
     /// @param account Address to mint the token to
     /// @return uint256 The ID of the minted token
-    /// @dev Revert if account is not whitelisted when whitelist is enabled
     /// @dev Revert if account is blacklisted
     /// @dev Revert if account already holds a token
     /// @notice ERC721 reverts if account == zero address
@@ -337,11 +337,9 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     }
 
     /// @param account Address to check
-    /// @dev Revert if account is not whitelisted when whitelist is enabled
     /// @dev Revert if account is blacklisted
     function _mintAsAdminChecks(address account) internal view {
         _revertIfAlreadyMinted(account);
-        if (_isWhitelistEnabled()) _revertIfNotWhitelisted(account);
         _revertIfBlacklisted(account);
     }
 
@@ -522,7 +520,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     //////////////////////////////////////////////////////////////*/
     /// @dev Sets the base URI for token metadata
     /// @param baseURI New base URI
-    function setBaseURI(string memory baseURI) external virtual onlyOwner {
+    function setBaseURI(string memory baseURI) external onlyOwner {
         _setBaseURI(baseURI);
         _hashTerms(baseURI);
     }

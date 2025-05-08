@@ -162,4 +162,6 @@ contract Invariant is StdInvariant, BaseTest {
     function invariant_termsHash_nonZero() public view {
         assertTrue(sbt.getTermsHash() != bytes32(0), "Invariant violated: Terms hash should never be zero.");
     }
+
+    // @review SignatureVerified event bytes param cant be hooked in certora, so test it here
 }

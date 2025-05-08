@@ -77,6 +77,9 @@ contract Handler is Test {
     /// @dev track private keys
     mapping(address account => uint256 privateKey) internal s_accountToPrivateKey;
 
+    /// @dev track signature emitted in SignatureVerified event
+    mapping(address signer => bytes signature) internal g_emittedSignature;
+
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
@@ -107,10 +110,14 @@ contract Handler is Test {
         deal(account, fee);
         _updateFeeGhosts(fee);
 
+        vm.recordLogs();
+
         /// @dev mint with terms
         bytes memory signature = _createSignature(account, s_accountToPrivateKey[account], sbt.getTermsHash());
         _changePrank(account);
         sbt.mintWithTerms{value: fee}(signature);
+
+        _handleLogs(account);
     }
 
     function mintAsAdmin(uint256 adminSeed, uint256 accountSeed) external {
@@ -306,8 +313,6 @@ contract Handler is Test {
             address account = _createAccount(accountSeed);
 
             /// @dev sanity conditions
-            // @review - why is this commented?
-            // _ifWhitelistedThenRemove(admin, account);
             _ifBlacklistedThenRemove(admin, account);
             if (g_holders[account]) _updateBurnGhosts(account);
 
@@ -521,6 +526,20 @@ contract Handler is Test {
         _updateAdminGhosts(admin, isAdmin);
         _changePrank(owner);
         sbt.setAdmin(admin, isAdmin);
+    }
+
+    function _handleLogs(address account) internal {
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 signatureVerifiedEvent = keccak256("SignatureVerified(address,bytes)");
+
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == signatureVerifiedEvent) {
+                // eventCount++;
+                // @review - come back to this
+                bytes memory emittedSignature = abi.decode(logs[i].data, (bytes));
+                g_emittedSignature[account] = emittedSignature;
+            }
+        }
     }
 
     /*//////////////////////////////////////////////////////////////

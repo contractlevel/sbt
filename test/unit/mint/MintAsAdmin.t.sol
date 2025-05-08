@@ -10,11 +10,6 @@ contract MintAsAdminTest is BaseTest {
         sbt.mintAsAdmin(notAdmin);
     }
 
-    function test_sbt_mintAsAdmin_revertsWhen_notWhitelisted() public {
-        vm.expectRevert(abi.encodeWithSignature("SoulBoundToken__NotWhitelisted(address)", notWhitelisted));
-        sbt.mintAsAdmin(notWhitelisted);
-    }
-
     function test_sbt_mintAsAdmin_revertsWhen_blacklisted() public {
         _whitelistEnabled(false);
         vm.expectRevert(abi.encodeWithSignature("SoulBoundToken__Blacklisted(address)", blacklisted));
