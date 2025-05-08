@@ -25,6 +25,7 @@ interface ISoulBoundToken is IERC721Enumerable {
     function setBaseURI(string memory baseURI) external;
     function withdrawFees(uint256 amountToWithdraw) external;
     function setAdmin(address account, bool isAdmin) external;
+    function batchSetAdmin(address[] calldata accounts, bool isAdmin) external;
 
     /// @dev getter functions
     function getWhitelisted(address account) external view returns (bool);
