@@ -34,7 +34,7 @@ interface ISoulBoundToken is IERC721Enumerable {
     function getWhitelistEnabled() external view returns (bool);
     function getTokenIdCounter() external view returns (uint256);
     function getBaseURI() external view returns (string memory);
-    /// @notice these two will be used in frontend
+    /// @notice these two will be used in frontend for facilitating user mints
     function getFee() external view returns (uint256);
     function getTermsHash() external view returns (bytes32);
 }
