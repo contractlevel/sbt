@@ -104,21 +104,21 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     //////////////////////////////////////////////////////////////*/
     /// @param name The name of the token
     /// @param symbol The symbol of the token
-    /// @param newContractURI The contract URI for the token
+    /// @param initialContractURI The contract URI for the token
     /// @param whitelistEnabled Whether the whitelist is enabled
     /// @dev Initializes the token ID counter to 1
     constructor(
         string memory name,
         string memory symbol,
-        string memory newContractURI,
+        string memory initialContractURI,
         bool whitelistEnabled,
         address nativeUsdFeed
     ) ERC721(name, symbol) Ownable(msg.sender) {
-        _setContractURI(newContractURI);
+        _setContractURI(initialContractURI);
         _setWhitelistEnabled(whitelistEnabled);
         s_tokenIdCounter = 1;
         i_nativeUsdFeed = AggregatorV3Interface(nativeUsdFeed);
-        _hashTerms(newContractURI);
+        _hashTerms(initialContractURI);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -139,7 +139,6 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @param accounts Addresses to mint the tokens to
     /// @return uint256[] The IDs of the minted tokens
     /// @dev Revert if accounts array is empty
-    /// @dev Revert if any of the accounts are not whitelisted when whitelist is enabled
     /// @dev Revert if any of the accounts are blacklisted
     /// @dev Revert if any of the accounts already hold a token
     /// @notice ERC721 reverts if any of the accounts == zero address
@@ -348,7 +347,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @dev Mints a new token to the specified address
     /// @param account Address to mint the token to
     /// @return uint256 The ID of the minted token
-    /// @dev Revert if account is not whitelisted when whitelist is enabled
+    /// @dev Revert if account already holds a token
     /// @dev Revert if account is blacklisted
     function _mintAsAdmin(address account) internal returns (uint256) {
         _mintAsAdminChecks(account);

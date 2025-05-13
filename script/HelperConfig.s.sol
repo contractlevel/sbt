@@ -11,7 +11,7 @@ contract HelperConfig is Script {
     struct NetworkConfig {
         string name;
         string symbol;
-        string baseURI;
+        string contractURI;
         bool whitelistEnabled;
         address nativeUsdFeed;
     }
@@ -34,7 +34,7 @@ contract HelperConfig is Script {
         return NetworkConfig({
             name: "Evo Labs Membership Token", // review format
             symbol: "EVO",
-            baseURI: "ipfs://QmfKN2Cq3HSNXVr36MXHdRMvH2PDrby3y1cH1aRFbTkf4C/", // dummy value, replace in production
+            contractURI: "ipfs://QmfKN2Cq3HSNXVr36MXHdRMvH2PDrby3y1cH1aRFbTkf4C/", // dummy value, replace in production
             whitelistEnabled: true,
             nativeUsdFeed: 0xb7B9A39CC63f856b90B364911CC324dC46aC1770 // https://docs.chain.link/data-feeds/price-feeds/addresses?page=1&network=optimism&search=eth
         });
@@ -44,7 +44,7 @@ contract HelperConfig is Script {
         return NetworkConfig({
             name: "Evo Labs Membership Token", // review format
             symbol: "EVO",
-            baseURI: "ipfs://QmfKN2Cq3HSNXVr36MXHdRMvH2PDrby3y1cH1aRFbTkf4C/", // dummy value, replace in production
+            contractURI: "ipfs://QmfKN2Cq3HSNXVr36MXHdRMvH2PDrby3y1cH1aRFbTkf4C/", // dummy value, replace in production
             whitelistEnabled: true,
             nativeUsdFeed: 0x694AA1769357215DE4FAC081bf1f309aDC325306 // https://docs.chain.link/data-feeds/price-feeds/addresses?page=1&network=optimism&search=eth
         });
@@ -58,7 +58,7 @@ contract HelperConfig is Script {
         return NetworkConfig({
             name: "Evo Labs SoulBoundToken", // review format
             symbol: "EVO",
-            baseURI: "ipfs://QmfKN2Cq3HSNXVr36MXHdRMvH2PDrby3y1cH1aRFbTkf4C/", // dummy value, replace in production
+            contractURI: "ipfs://QmfKN2Cq3HSNXVr36MXHdRMvH2PDrby3y1cH1aRFbTkf4C/", // dummy value, replace in production
             whitelistEnabled: true,
             nativeUsdFeed: address(mockPriceFeed)
         });

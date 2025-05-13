@@ -285,7 +285,7 @@ contract Handler is Test {
         address account = _createAccount(accountSeed);
 
         /// @dev sanity conditions
-        // _ifWhitelistedThenRemove(admin, account);
+        _ifWhitelistedThenRemove(admin, account);
         _ifBlacklistedThenRemove(admin, account);
 
         /// @dev add to blacklist
@@ -308,6 +308,7 @@ contract Handler is Test {
 
             /// @dev sanity conditions
             _ifBlacklistedThenRemove(admin, account);
+            _ifWhitelistedThenRemove(admin, account);
             if (g_holders[account]) _updateBurnGhosts(account);
 
             /// @dev add account to batch
