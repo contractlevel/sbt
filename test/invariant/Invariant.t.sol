@@ -41,7 +41,7 @@ contract Invariant is StdInvariant, BaseTest {
         /// @dev owner functions
         selectors[13] = Handler.setAdmin.selector;
         selectors[14] = Handler.batchSetAdmin.selector;
-        selectors[15] = Handler.setBaseURI.selector;
+        selectors[15] = Handler.setContractURI.selector;
         selectors[16] = Handler.withdrawFees.selector;
         /// @dev other admin functions
         selectors[17] = Handler.setFeeFactor.selector;
@@ -149,12 +149,12 @@ contract Invariant is StdInvariant, BaseTest {
         );
     }
 
-    // Terms Hash: The terms hash should always be the hash of the baseURI
-    function invariant_termsHash_baseURI() public view {
+    // Terms Hash: The terms hash should always be the hash of the contractURI
+    function invariant_termsHash_contractURI() public view {
         assertEq(
             sbt.getTermsHash(),
-            keccak256(abi.encodePacked(sbt.getBaseURI())),
-            "Invariant violated: Terms hash should be equal to the hash of the baseURI."
+            keccak256(abi.encodePacked(sbt.getContractURI())),
+            "Invariant violated: Terms hash should be equal to the hash of the contractURI."
         );
     }
 

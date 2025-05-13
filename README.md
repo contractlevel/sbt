@@ -21,7 +21,7 @@ A SoulBoundToken contract for Optimism with administrative whitelist and blackli
     - [Whitelist Management](#whitelist-management)
     - [Blacklist Management](#blacklist-management)
     - [Assign/Revoke Admin](#assignrevoke-admin)
-    - [Base URI](#base-uri)
+    - [Contract URI](#contract-uri)
   - [Usage](#usage)
   - [Testing](#testing)
   - [Formal Verification](#formal-verification)
@@ -53,7 +53,7 @@ There are four key roles in this system:
 ### Owner
 
 - Can assign and revoke admin roles.
-- Can set the base URI for token metadata.
+- Can set the contract URI for token metadata.
 
 ### Admins
 
@@ -90,7 +90,7 @@ When the `SoulBoundToken` contract is deployed, the following parameters must be
 
 - `name`: The name of the token (e.g., "SoulBoundToken").
 - `symbol`: The symbol of the token (e.g., "SBT").
-- `baseURI`: The base URI for token metadata (e.g., "https://ipfs.io/ipfs/<CID>/").
+- `contractURI`: The contract URI for token metadata (e.g., "https://ipfs.io/ipfs/<CID>/").
 - `whitelistEnabled`: A boolean indicating whether the whitelist is initially enabled (`true`) or disabled (`false`).
 
 The deployer of the contract becomes the initial owner. **NOTE: This can be changed so the initial owner can be set to another address on deployment.**
@@ -218,10 +218,10 @@ Below are the external functions that modify the contract's state:
     - `accounts` array must not be empty.
     - For each address: same checks as `setAdmin`.
 
-### Base URI
+### Contract URI
 
-- **`setBaseURI(string memory baseURI)`**
-  - **Description**: Sets the base URI for token metadata.
+- **`setContractURI(string memory contractURI)`**
+  - **Description**: Sets the contract URI for token metadata.
   - **Requirements**:
     - Caller must be the owner.
   - **Note**:
@@ -234,14 +234,14 @@ Below are the external functions that modify the contract's state:
    - Deploy the contract with:
      - `name`: The token name (e.g., "SoulBoundToken").
      - `symbol`: The token symbol (e.g., "SBT").
-     - `baseURI`: The base URI for token metadata (e.g., "https://ipfs.io/ipfs/<CID>/").
+     - `contractURI`: The contract URI for token metadata (e.g., "https://ipfs.io/ipfs/<CID>/").
      - `whitelistEnabled`: Initial whitelist status (`true` or `false`).
    - The deployer becomes the initial owner.
 
 2. **Owner Setup**:
 
    - Assign admin roles using `setAdmin` or `batchSetAdmin`.
-   - Optionally, update the `baseURI` with `setBaseURI`.
+   - Optionally, update the `contractURI` with `setContractURI`.
 
 3. **Admin Actions**:
 

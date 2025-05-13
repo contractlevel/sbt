@@ -23,6 +23,7 @@ contract HelperConfig is Script {
     //////////////////////////////////////////////////////////////*/
     constructor() {
         if (block.chainid == 10) activeNetworkConfig = getOptimismConfig();
+        if (block.chainid == 11155111) activeNetworkConfig = getEthSepoliaConfig();
         else activeNetworkConfig = getOrCreateAnvilEthConfig();
     }
 
@@ -31,11 +32,21 @@ contract HelperConfig is Script {
     //////////////////////////////////////////////////////////////*/
     function getOptimismConfig() public pure returns (NetworkConfig memory) {
         return NetworkConfig({
-            name: "Evo Labs SoulBoundToken", // review format
+            name: "Evo Labs Membership Token", // review format
             symbol: "EVO",
             baseURI: "ipfs://QmfKN2Cq3HSNXVr36MXHdRMvH2PDrby3y1cH1aRFbTkf4C/", // dummy value, replace in production
             whitelistEnabled: true,
             nativeUsdFeed: 0xb7B9A39CC63f856b90B364911CC324dC46aC1770 // https://docs.chain.link/data-feeds/price-feeds/addresses?page=1&network=optimism&search=eth
+        });
+    }
+
+    function getEthSepoliaConfig() public pure returns (NetworkConfig memory) {
+        return NetworkConfig({
+            name: "Evo Labs Membership Token", // review format
+            symbol: "EVO",
+            baseURI: "ipfs://QmfKN2Cq3HSNXVr36MXHdRMvH2PDrby3y1cH1aRFbTkf4C/", // dummy value, replace in production
+            whitelistEnabled: true,
+            nativeUsdFeed: 0x694AA1769357215DE4FAC081bf1f309aDC325306 // https://docs.chain.link/data-feeds/price-feeds/addresses?page=1&network=optimism&search=eth
         });
     }
 

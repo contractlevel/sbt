@@ -56,16 +56,15 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @dev Chainlink price feed for native/USD
     AggregatorV3Interface internal immutable i_nativeUsdFeed;
 
-    /// @dev Hash of base URI (which is intended to be IPFS resource for Terms of Service)
+    /// @dev Hash of contract URI (which is intended to be IPFS resource for Terms of Service)
     bytes32 internal s_termsHash;
     /// @dev Admin-configurable value used to calculate mint fee
     /// @notice This value should be in USD with 18 decimals. ie 1 USD = 1e18 (1000000000000000000)
     uint256 internal s_feeFactor;
     /// @dev Token counter for minting
     uint256 internal s_tokenIdCounter;
-    // @review replace this with s_contractURI;
-    /// @dev Base URI for token metadata
-    string internal s_baseURI;
+    /// @dev Contract URI for token metadata
+    string internal s_contractURI;
     /// @dev Mapping for whitelist
     mapping(address account => bool isWhitelisted) internal s_whitelist;
     /// @dev Mapping for blacklist
@@ -83,9 +82,9 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     event AddedToBlacklist(address indexed account);
     event RemovedFromBlacklist(address indexed account);
     event UpdatedWhitelistEnabled(bool indexed isWhitelistEnabled);
-    event UpdatedBaseURI(string newBaseURI);
+    event ContractURIUpdated();
     event AdminStatusSet(address indexed account, bool indexed isAdmin);
-    event TermsHashed(bytes32 indexed hashedTerms, string baseURI);
+    event TermsHashed(bytes32 indexed hashedTerms, string contractURI);
     event FeeCollected(address indexed user, uint256 amount, uint256 tokenId);
     event FeesWithdrawn(uint256 amount);
     event FeeFactorSet(uint256 feeFactor);
@@ -105,21 +104,21 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     //////////////////////////////////////////////////////////////*/
     /// @param name The name of the token
     /// @param symbol The symbol of the token
-    /// @param baseURI The base URI for the token
+    /// @param contractURI The contract URI for the token
     /// @param whitelistEnabled Whether the whitelist is enabled
     /// @dev Initializes the token ID counter to 1
     constructor(
         string memory name,
         string memory symbol,
-        string memory baseURI,
+        string memory contractURI,
         bool whitelistEnabled,
         address nativeUsdFeed
     ) ERC721(name, symbol) Ownable(msg.sender) {
-        _setBaseURI(baseURI);
+        _setContractURI(contractURI);
         _setWhitelistEnabled(whitelistEnabled);
         s_tokenIdCounter = 1;
         i_nativeUsdFeed = AggregatorV3Interface(nativeUsdFeed);
-        _hashTerms(baseURI);
+        _hashTerms(contractURI);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -169,6 +168,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
         _revertIfNotWhitelisted(msg.sender);
         _revertIfAlreadyMinted(msg.sender);
         tokenId = _mintSoulBoundToken(msg.sender);
+        // @review - is this condition for emitting the event optimal? we could have if (fee != 0)
         if (msg.value > 0) emit FeeCollected(msg.sender, msg.value, tokenId);
     }
 
@@ -191,6 +191,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
 
         tokenId = _mintSoulBoundToken(msg.sender);
 
+        // @review - is this condition for emitting the event optimal? we could have if (fee != 0)
         if (msg.value > 0) emit FeeCollected(msg.sender, msg.value, tokenId);
     }
 
@@ -446,10 +447,10 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     }
 
     /// @dev Sets the base URI for token metadata
-    /// @param baseURI New base URI
-    function _setBaseURI(string memory baseURI) internal {
-        s_baseURI = baseURI;
-        emit UpdatedBaseURI(baseURI);
+    /// @param contractURI New contract URI
+    function _setContractURI(string memory contractURI) internal {
+        s_contractURI = contractURI;
+        emit ContractURIUpdated();
     }
 
     /// @dev Check if whitelist is enabled
@@ -488,12 +489,12 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
         return error == ECDSA.RecoverError.NoError && recovered == msg.sender;
     }
 
-    /// @param baseURI SBT base URI (intended to be IPFS resource)
-    /// @dev Hashes the baseURI and stores it
-    function _hashTerms(string memory baseURI) internal {
-        bytes32 hashedTerms = keccak256(abi.encodePacked(baseURI));
+    /// @param contractURI SBT contract URI (intended to be IPFS resource)
+    /// @dev Hashes the contractURI and stores it
+    function _hashTerms(string memory contractURI) internal {
+        bytes32 hashedTerms = keccak256(abi.encodePacked(contractURI));
         s_termsHash = hashedTerms;
-        emit TermsHashed(hashedTerms, baseURI);
+        emit TermsHashed(hashedTerms, contractURI);
     }
 
     /// @dev reverts if msg.value is less than fee
@@ -518,11 +519,11 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /*//////////////////////////////////////////////////////////////
                                  SETTER
     //////////////////////////////////////////////////////////////*/
-    /// @dev Sets the base URI for token metadata
-    /// @param baseURI New base URI
-    function setBaseURI(string memory baseURI) external onlyOwner {
-        _setBaseURI(baseURI);
-        _hashTerms(baseURI);
+    /// @dev Sets the contract URI for token metadata
+    /// @param contractURI New contract URI
+    function setContractURI(string memory contractURI) external onlyOwner {
+        _setContractURI(contractURI);
+        _hashTerms(contractURI);
     }
 
     /// @dev Sets whitelist to enabled
@@ -569,10 +570,10 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
         return _isWhitelistEnabled();
     }
 
-    /// @dev Returns the base URI for token metadata
-    /// @return string The base URI
-    function getBaseURI() external view returns (string memory) {
-        return _baseURI();
+    /// @dev Returns the contract URI for token metadata
+    /// @return string The contract URI
+    function contractURI() external view returns (string memory) {
+        return _contractURI();
     }
 
     /// @return tokenIdCounter token ID for the next token to be minted
@@ -603,10 +604,10 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /*//////////////////////////////////////////////////////////////
                                 OVERRIDE
     //////////////////////////////////////////////////////////////*/
-    /// @dev Returns the base URI for token metadata
-    /// @return string The base URI
-    function _baseURI() internal view override returns (string memory) {
-        return s_baseURI;
+    /// @dev Returns the contract URI for token metadata
+    /// @return string The contract URI
+    function _contractURI() internal view returns (string memory) {
+        return s_contractURI;
     }
 
     /// @dev Override to prevent approval for non-transferrable tokens

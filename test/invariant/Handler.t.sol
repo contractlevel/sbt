@@ -31,15 +31,6 @@ contract Handler is Test {
     /// @dev track the holders in the system
     EnumerableSet.AddressSet internal holders;
 
-    // @review - is this being used?
-    enum Set {
-        Accounts,
-        Admins,
-        Whitelisted,
-        Blacklisted,
-        Holders
-    }
-
     /*//////////////////////////////////////////////////////////////
                                  GHOSTS
     //////////////////////////////////////////////////////////////*/
@@ -402,10 +393,10 @@ contract Handler is Test {
         sbt.batchSetAdmin(adminsToSet, isAdmin);
     }
 
-    function setBaseURI(bytes32 baseURIBytes32) external {
-        string memory baseURI = string(abi.encodePacked(baseURIBytes32));
+    function setContractURI(bytes32 contractURIBytes32) external {
+        string memory contractURI = string(abi.encodePacked(contractURIBytes32));
         _changePrank(owner);
-        sbt.setBaseURI(baseURI);
+        sbt.setContractURI(contractURI);
     }
 
     function withdrawFees(uint256 amountToWithdraw) external {

@@ -17,7 +17,7 @@ contract BaseTest is Test {
     HelperConfig internal config;
     string internal name;
     string internal symbol;
-    string internal baseURI;
+    string internal contractURI;
     bool internal whitelistEnabled;
     address internal nativeUsdFeed;
 
@@ -72,7 +72,7 @@ contract BaseTest is Test {
         (sbt, config) = deploy.run();
 
         /// @dev fetch args passed in constructor by deploy script
-        (name, symbol, baseURI, whitelistEnabled, nativeUsdFeed) = config.activeNetworkConfig();
+        (name, symbol, contractURI, whitelistEnabled, nativeUsdFeed) = config.activeNetworkConfig();
 
         /// @dev store owner
         _changePrank(sbt.owner());
