@@ -295,6 +295,7 @@ certoraRun ./certora/conf/SoulBoundToken.conf
 
 - **Separate Add/Remove Functions**: Functions like `addToWhitelist` and `removeFromWhitelist` are separate rather than combined into a single `setWhitelist(address, bool)` function. This design choice prioritizes simplicity and readability over a more compact but less intuitive interface. The same applies to blacklist and batch equivalents.
 - **Token ID Management**: The `_incrementTokenIdCounter` function optimizes storage reads and writes during batch minting.
+- OpenZeppelin's Access control could replace the role management, but wouldn't make any difference in functionality or optimization
 
 ## Frontend Notes
 

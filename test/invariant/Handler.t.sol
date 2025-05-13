@@ -66,10 +66,12 @@ contract Handler is Test {
     uint256 public g_totalFeesWithdrawn;
 
     /// @dev track private keys
-    mapping(address account => uint256 privateKey) internal s_accountToPrivateKey;
+    mapping(address account => uint256 privateKey) public s_accountToPrivateKey;
+    /// @dev track the hashed terms at time of mintWithTerms
+    mapping(address signer => bytes32 hashedTerms) public g_hashedTerms;
 
     /// @dev track signature emitted in SignatureVerified event
-    mapping(address signer => bytes signature) internal g_emittedSignature;
+    mapping(address signer => bytes signature) public g_emittedSignature;
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -105,6 +107,7 @@ contract Handler is Test {
 
         /// @dev mint with terms
         bytes memory signature = _createSignature(account, s_accountToPrivateKey[account], sbt.getTermsHash());
+        g_hashedTerms[account] = sbt.getTermsHash();
         _changePrank(account);
         sbt.mintWithTerms{value: fee}(signature);
 
@@ -529,6 +532,9 @@ contract Handler is Test {
                 // @review - come back to this
                 bytes memory emittedSignature = abi.decode(logs[i].data, (bytes));
                 g_emittedSignature[account] = emittedSignature;
+
+                address emittedSigner = address(uint160(uint256(logs[i].topics[1])));
+                assertEq(emittedSigner, account);
             }
         }
     }

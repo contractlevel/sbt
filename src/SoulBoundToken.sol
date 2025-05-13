@@ -17,7 +17,7 @@ import {ISoulBoundToken} from "./interfaces/ISoulBoundToken.sol";
 /// @author @contractlevel
 /// @notice Non-transferrable ERC721 token with administrative whitelist and blacklist functionality
 /// @notice System Actors: Owner, Admins, Whitelisted, Blacklisted
-/// @dev Owner - sets admin role and base URI
+/// @dev Owner - sets admin role and contract URI
 /// @dev Admins - set whitelisted and blacklisted roles, and enables/disables whitelist
 /// @dev Whitelisted - can mint a token if whitelist is enabled
 /// @dev Blacklisted - if held token, then burnt, and if whitelisted, then removed, and cant be whitelisted or minted
@@ -104,21 +104,21 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     //////////////////////////////////////////////////////////////*/
     /// @param name The name of the token
     /// @param symbol The symbol of the token
-    /// @param contractURI The contract URI for the token
+    /// @param newContractURI The contract URI for the token
     /// @param whitelistEnabled Whether the whitelist is enabled
     /// @dev Initializes the token ID counter to 1
     constructor(
         string memory name,
         string memory symbol,
-        string memory contractURI,
+        string memory newContractURI,
         bool whitelistEnabled,
         address nativeUsdFeed
     ) ERC721(name, symbol) Ownable(msg.sender) {
-        _setContractURI(contractURI);
+        _setContractURI(newContractURI);
         _setWhitelistEnabled(whitelistEnabled);
         s_tokenIdCounter = 1;
         i_nativeUsdFeed = AggregatorV3Interface(nativeUsdFeed);
-        _hashTerms(contractURI);
+        _hashTerms(newContractURI);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -173,8 +173,8 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     }
 
     /// @dev Mints a new token to the msg.sender if they sign the termsHash
-    /// @notice This function requires a signature from the msg.sender, including the hash of this token's base URI
-    /// The base URI is intended to be an IPFS reference containing Terms of Service for token holders.
+    /// @notice This function requires a signature from the msg.sender, including the hash of this token's contract URI
+    /// The contract URI is intended to be an IPFS reference containing Terms of Service for token holders.
     /// @param signature Signed by msg.sender with Terms of Service hash
     /// @dev Revert if insufficient fee (ie msg.value is less than getFee())
     /// @dev Revert if whitelist is enabled
@@ -183,6 +183,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     function mintWithTerms(bytes memory signature) external payable returns (uint256 tokenId) {
         _revertIfInsufficientFee();
         _revertIfBlacklisted(msg.sender);
+        // @review - this could be removed, allowing any user to mint with terms despite whitelist enabled/disabled
         if (_isWhitelistEnabled()) revert SoulBoundToken__WhitelistEnabled();
         _revertIfAlreadyMinted(msg.sender);
 
@@ -446,10 +447,10 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
         emit UpdatedWhitelistEnabled(whitelistEnabled);
     }
 
-    /// @dev Sets the base URI for token metadata
-    /// @param contractURI New contract URI
-    function _setContractURI(string memory contractURI) internal {
-        s_contractURI = contractURI;
+    /// @dev Sets the contract URI for token metadata
+    /// @param newContractURI New contract URI
+    function _setContractURI(string memory newContractURI) internal {
+        s_contractURI = newContractURI;
         emit ContractURIUpdated();
     }
 
@@ -489,12 +490,12 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
         return error == ECDSA.RecoverError.NoError && recovered == msg.sender;
     }
 
-    /// @param contractURI SBT contract URI (intended to be IPFS resource)
+    /// @param newContractURI SBT contract URI (intended to be IPFS resource)
     /// @dev Hashes the contractURI and stores it
-    function _hashTerms(string memory contractURI) internal {
-        bytes32 hashedTerms = keccak256(abi.encodePacked(contractURI));
+    function _hashTerms(string memory newContractURI) internal {
+        bytes32 hashedTerms = keccak256(abi.encodePacked(newContractURI));
         s_termsHash = hashedTerms;
-        emit TermsHashed(hashedTerms, contractURI);
+        emit TermsHashed(hashedTerms, newContractURI);
     }
 
     /// @dev reverts if msg.value is less than fee
@@ -520,10 +521,10 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
                                  SETTER
     //////////////////////////////////////////////////////////////*/
     /// @dev Sets the contract URI for token metadata
-    /// @param contractURI New contract URI
-    function setContractURI(string memory contractURI) external onlyOwner {
-        _setContractURI(contractURI);
-        _hashTerms(contractURI);
+    /// @param newContractURI New contract URI
+    function setContractURI(string memory newContractURI) external onlyOwner {
+        _setContractURI(newContractURI);
+        _hashTerms(newContractURI);
     }
 
     /// @dev Sets whitelist to enabled
@@ -586,7 +587,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
         return _getFee();
     }
 
-    /// @return termsHash This is a hash of the base URI which should be used when signing a message to mint with terms
+    /// @return termsHash This is a hash of the contract URI which should be used when signing a message to mint with terms
     function getTermsHash() external view returns (bytes32) {
         return s_termsHash;
     }

@@ -13,6 +13,6 @@ contract SetContractURITest is BaseTest {
     function test_sbt_setContractURI_success() public {
         _changePrank(owner);
         sbt.setContractURI("test");
-        assertEq(sbt.getContractURI(), "test");
+        assertEq(sbt.contractURI(), "test");
     }
 }

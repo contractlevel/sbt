@@ -153,7 +153,7 @@ contract Invariant is StdInvariant, BaseTest {
     function invariant_termsHash_contractURI() public view {
         assertEq(
             sbt.getTermsHash(),
-            keccak256(abi.encodePacked(sbt.getContractURI())),
+            keccak256(abi.encodePacked(sbt.contractURI())),
             "Invariant violated: Terms hash should be equal to the hash of the contractURI."
         );
     }
@@ -163,5 +163,17 @@ contract Invariant is StdInvariant, BaseTest {
         assertTrue(sbt.getTermsHash() != bytes32(0), "Invariant violated: Terms hash should never be zero.");
     }
 
-    // @review SignatureVerified event bytes param cant be hooked in certora, so test it here
+    // Signature emitted in SignatureVerified event should be the same as the signature created by the signer
+    function invariant_signatureVerified_bytesParam() public {
+        handler.forEachHolder(this.checkSignatureVerifiedBytesParam);
+    }
+
+    function checkSignatureVerifiedBytesParam(address holder) external view {
+        if (handler.g_emittedSignature(holder).length > 0) {
+            assertEq(
+                handler.g_emittedSignature(holder),
+                _createSignature(holder, handler.s_accountToPrivateKey(holder), handler.g_hashedTerms(holder))
+            );
+        }
+    }
 }
