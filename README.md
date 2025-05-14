@@ -21,12 +21,20 @@ A SoulBoundToken contract for Optimism with administrative whitelist and blackli
     - [Whitelist Management](#whitelist-management)
     - [Blacklist Management](#blacklist-management)
     - [Assign/Revoke Admin](#assignrevoke-admin)
-    - [Base URI](#base-uri)
+    - [Contract URI](#contract-uri)
   - [Usage](#usage)
   - [Testing](#testing)
   - [Formal Verification](#formal-verification)
   - [Important Notes](#important-notes)
   - [Comments on Design Choices](#comments-on-design-choices)
+  - [Frontend Notes](#frontend-notes)
+    - [Libraries for connecting frontend to smart contract:](#libraries-for-connecting-frontend-to-smart-contract)
+    - [What is needed?](#what-is-needed)
+    - [Non-admin/user mints](#non-adminuser-mints)
+      - [Fee](#fee)
+      - [Signature](#signature)
+    - [Fee Factor](#fee-factor)
+    - [getFee()](#getfee)
   - [License](#license)
 
 ## Features
@@ -45,7 +53,7 @@ There are four key roles in this system:
 ### Owner
 
 - Can assign and revoke admin roles.
-- Can set the base URI for token metadata.
+- Can set the contract URI for token metadata.
 
 ### Admins
 
@@ -82,7 +90,7 @@ When the `SoulBoundToken` contract is deployed, the following parameters must be
 
 - `name`: The name of the token (e.g., "SoulBoundToken").
 - `symbol`: The symbol of the token (e.g., "SBT").
-- `baseURI`: The base URI for token metadata (e.g., "https://ipfs.io/ipfs/<CID>/").
+- `contractURI`: The contract URI for token metadata (e.g., "https://ipfs.io/ipfs/<CID>/").
 - `whitelistEnabled`: A boolean indicating whether the whitelist is initially enabled (`true`) or disabled (`false`).
 
 The deployer of the contract becomes the initial owner. **NOTE: This can be changed so the initial owner can be set to another address on deployment.**
@@ -210,10 +218,10 @@ Below are the external functions that modify the contract's state:
     - `accounts` array must not be empty.
     - For each address: same checks as `setAdmin`.
 
-### Base URI
+### Contract URI
 
-- **`setBaseURI(string memory baseURI)`**
-  - **Description**: Sets the base URI for token metadata.
+- **`setContractURI(string memory contractURI)`**
+  - **Description**: Sets the contract URI for token metadata.
   - **Requirements**:
     - Caller must be the owner.
   - **Note**:
@@ -226,14 +234,14 @@ Below are the external functions that modify the contract's state:
    - Deploy the contract with:
      - `name`: The token name (e.g., "SoulBoundToken").
      - `symbol`: The token symbol (e.g., "SBT").
-     - `baseURI`: The base URI for token metadata (e.g., "https://ipfs.io/ipfs/<CID>/").
+     - `contractURI`: The contract URI for token metadata (e.g., "https://ipfs.io/ipfs/<CID>/").
      - `whitelistEnabled`: Initial whitelist status (`true` or `false`).
    - The deployer becomes the initial owner.
 
 2. **Owner Setup**:
 
    - Assign admin roles using `setAdmin` or `batchSetAdmin`.
-   - Optionally, update the `baseURI` with `setBaseURI`.
+   - Optionally, update the `contractURI` with `setContractURI`.
 
 3. **Admin Actions**:
 
@@ -274,6 +282,12 @@ export CERTORAKEY=<YOUR_KEY_HERE>
 certoraRun ./certora/conf/SoulBoundToken.conf
 ```
 
+A separate specification file is used for the `FeesAccountancy` invariant. This is because we needed to summarize the `_verifySignature()` logic in order to prevent the prover from auto havocing `onERC721Received()`. For some reason the full `_verifySignature()` causes the prover to havoc `onERC721Received()` even though we have used a dispatcher summary and included its implementation in our scene. To verify this invariant, run the following configuration:
+
+```
+certoraRun ./certora/conf/FeesAccountancy.conf
+```
+
 ## Important Notes
 
 - **Non-transferrable Tokens**: Tokens cannot be transferred. Attempts to call `transferFrom`, `approve`, or `setApprovalForAll` will revert with `SoulBoundToken__TransferNotAllowed` or `SoulBoundToken__ApprovalNotAllowed`.
@@ -287,6 +301,63 @@ certoraRun ./certora/conf/SoulBoundToken.conf
 
 - **Separate Add/Remove Functions**: Functions like `addToWhitelist` and `removeFromWhitelist` are separate rather than combined into a single `setWhitelist(address, bool)` function. This design choice prioritizes simplicity and readability over a more compact but less intuitive interface. The same applies to blacklist and batch equivalents.
 - **Token ID Management**: The `_incrementTokenIdCounter` function optimizes storage reads and writes during batch minting.
+- OpenZeppelin's Access control could replace the role management, but wouldn't make any difference in functionality or optimization
+
+## Frontend Notes
+
+### Libraries for connecting frontend to smart contract:
+
+[ethers.js](https://docs.ethers.org/v6/) - this is the most popular and probably the best option.
+
+[web3.js](https://web3js.readthedocs.io/en/v1.10.0/) - there's also this one if you have issues with ethers.
+
+### What is needed?
+
+- deployed SBT contract address
+- probably rpc url for the blockchain network contract is deployed to
+- contract ABI (application binary interface) - this is like a JSON file with information about the contract's functions and is created when the contract is compiled. I can find it later
+
+### Non-admin/user mints
+
+#### Fee
+
+Users will have to pay a fee (if there is a fee) when minting a token. The fee can be retrieved from the contract's `getFee()` function (will return 0 if no fee) and should be passed as a `msg.value`.
+
+Fees apply to both `mintAsWhitelisted()` and `mintWithTerms()`.
+
+#### Signature
+
+`mintWithTerms()` takes a signature as an argument. The signature must be unique to the user/msg.sender.
+
+This is the logic in the contract for creating the signature:
+
+```
+/// @dev compute the message hash: keccak256(termsHash, msg.sender)
+bytes32 messageHash = keccak256(abi.encodePacked(s_termsHash, msg.sender));
+
+/// @dev apply Ethereum signed message prefix
+bytes32 ethSignedMessageHash = MessageHashUtils.toEthSignedMessageHash(messageHash);
+```
+
+The value of `s_termsHash` can be retrieved from `getTermsHash()`, so you want to take that value and the user's address and create a hash of that using `keccak256(abi.encodePacked())` - ethers.js should be able to do this. Let me know if you need more information.
+
+Then the hash that has been created with the `getTermsHash()` and user's address needs to be prefixed with a standard formatting thing for eth signatures. The logic in the library I've used looks like this:
+
+```
+keccak256(bytes.concat("\x19Ethereum Signed Message:\n", bytes(Strings.toString(message.length)), message));
+```
+
+ethers.js should probably be able to do this too. Consider double checking this bit with AI.
+
+### Fee Factor
+
+The `setFeeFactor(uint256 newFeeFactor)` takes a uint256 `newFeeFactor` as an argument. This value is used to calculate the fee for minting. Solidity has no decimal places and 18 decimals is standardly used so if you want to set the fee to be $1 in value, use `1000000000000000000` (18 0's).
+
+Similarly $0.50 would be `500000000000000000` (17 0's).
+
+### getFee()
+
+`getFee()` will also return a value with 18 decimal places, so if you are displaying the fee for a mint on the frontend, consider accounting for that. The currency will be in native/ETH.
 
 ## License
 

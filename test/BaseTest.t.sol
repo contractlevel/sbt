@@ -2,7 +2,8 @@
 pragma solidity 0.8.24;
 
 import {Test, Vm, console2} from "forge-std/Test.sol";
-import {DeploySoulBoundToken, SoulBoundToken} from "../script/DeploySoulBoundToken.s.sol";
+import {DeploySoulBoundToken, SoulBoundToken, HelperConfig} from "../script/DeploySoulBoundToken.s.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 contract BaseTest is Test {
     /*//////////////////////////////////////////////////////////////
@@ -13,12 +14,14 @@ contract BaseTest is Test {
     uint256 internal optimismFork;
 
     SoulBoundToken internal sbt;
+    HelperConfig internal config;
     string internal name;
     string internal symbol;
-    string internal baseURI;
+    string internal contractURI;
     bool internal whitelistEnabled;
+    address internal nativeUsdFeed;
 
-    address internal owner = makeAddr("owner");
+    address internal owner;
     address internal admin = makeAddr("admin");
     address internal notOwner = makeAddr("notOwner");
     address internal notAdmin = makeAddr("notAdmin");
@@ -26,14 +29,19 @@ contract BaseTest is Test {
     address internal notBlacklisted = makeAddr("notBlacklisted");
     address internal blacklisted = makeAddr("blacklisted");
     address internal whitelisted = makeAddr("whitelisted");
-    address internal user = makeAddr("user");
-    address internal user2 = makeAddr("user2");
+    address internal user;
+    uint256 internal userPk;
+    address internal user2;
+    uint256 internal user2Pk;
     address[] internal accounts;
 
     /*//////////////////////////////////////////////////////////////
                                  SET UP
     //////////////////////////////////////////////////////////////*/
     function setUp() public virtual {
+        (user, userPk) = makeAddrAndKey("user");
+        (user2, user2Pk) = makeAddrAndKey("user2");
+
         _forkOptimism();
         _deployInfra();
 
@@ -61,15 +69,10 @@ contract BaseTest is Test {
     function _deployInfra() internal {
         /// @dev run deploy script
         DeploySoulBoundToken deploy = new DeploySoulBoundToken();
-        sbt = deploy.run();
+        (sbt, config) = deploy.run();
 
         /// @dev fetch args passed in constructor by deploy script
-        (name, symbol, baseURI, whitelistEnabled) = deploy.getDeployArgs();
-
-        /// @dev store owner
-        _changePrank(sbt.owner());
-        sbt.transferOwnership(owner);
-        _stopPrank();
+        (name, symbol, contractURI, whitelistEnabled, nativeUsdFeed, owner) = config.activeNetworkConfig();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -102,5 +105,23 @@ contract BaseTest is Test {
     function _whitelistEnabled(bool isEnabled) internal {
         _changePrank(admin);
         sbt.setWhitelistEnabled(isEnabled);
+    }
+
+    function _createSignature(address signer, uint256 signerKey, bytes32 termsHash)
+        internal
+        pure
+        returns (bytes memory)
+    {
+        bytes32 messageHash = keccak256(abi.encodePacked(termsHash, signer));
+        bytes32 ethSignedMessageHash = MessageHashUtils.toEthSignedMessageHash(messageHash);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, ethSignedMessageHash);
+        return abi.encodePacked(r, s, v);
+    }
+
+    function _setFeeFactorAndDealFee(uint256 feeFactor, address dealTo) internal returns (uint256 fee) {
+        _changePrank(admin);
+        sbt.setFeeFactor(feeFactor);
+        fee = sbt.getFee();
+        deal(dealTo, fee);
     }
 }

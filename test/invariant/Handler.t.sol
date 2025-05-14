@@ -3,6 +3,8 @@ pragma solidity 0.8.24;
 
 import {Test, Vm, console2, SoulBoundToken} from "../BaseTest.t.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import {MockV3Aggregator} from "../mocks/MockV3Aggregator.sol";
 
 contract Handler is Test {
     /*//////////////////////////////////////////////////////////////
@@ -29,14 +31,6 @@ contract Handler is Test {
     /// @dev track the holders in the system
     EnumerableSet.AddressSet internal holders;
 
-    enum Set {
-        Accounts,
-        Admins,
-        Whitelisted,
-        Blacklisted,
-        Holders
-    }
-
     /*//////////////////////////////////////////////////////////////
                                  GHOSTS
     //////////////////////////////////////////////////////////////*/
@@ -52,6 +46,8 @@ contract Handler is Test {
     /// @dev track the number of SBT holders
     uint256 public g_amountOfHolders;
 
+    /// @dev track the number of mintWithTerms calls
+    uint256 public g_mintWithTermsCalls;
     /// @dev track the number of mintAsAdmin calls
     uint256 public g_mintAsAdminCalls;
     /// @dev track the number of mintAsWhitelisted calls
@@ -64,6 +60,19 @@ contract Handler is Test {
     /// @dev track the total burned
     uint256 public g_totalBurned;
 
+    /// @dev track the total fees accumulated
+    uint256 public g_totalFeesAccumulated;
+    /// @dev track the total fees withdrawn
+    uint256 public g_totalFeesWithdrawn;
+
+    /// @dev track private keys
+    mapping(address account => uint256 privateKey) public s_accountToPrivateKey;
+    /// @dev track the hashed terms at time of mintWithTerms
+    mapping(address signer => bytes32 hashedTerms) public g_hashedTerms;
+
+    /// @dev track signature emitted in SignatureVerified event
+    mapping(address signer => bytes signature) public g_emittedSignature;
+
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
@@ -75,6 +84,36 @@ contract Handler is Test {
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
+    function mintWithTerms(uint256 adminSeed, uint256 accountSeed) external {
+        /// @dev get actors
+        address admin = _createOrGetAdmin(adminSeed);
+        address account = _createOrGetAccount(accountSeed);
+
+        /// @dev sanity conditions
+        if (sbt.balanceOf(account) > 0) return;
+        _ifBlacklistedThenRemove(admin, account);
+        if (sbt.getWhitelistEnabled()) _setWhitelistEnabled(admin, false);
+
+        /// @dev update mint ghosts
+        _updateMintGhosts(account);
+        g_mintWithTermsCalls++;
+
+        /// @dev handle fees and update fee ghosts
+        uint256 fee = sbt.getFee();
+        deal(account, fee);
+        _updateFeeGhosts(fee);
+
+        vm.recordLogs();
+
+        /// @dev mint with terms
+        bytes memory signature = _createSignature(account, s_accountToPrivateKey[account], sbt.getTermsHash());
+        g_hashedTerms[account] = sbt.getTermsHash();
+        _changePrank(account);
+        sbt.mintWithTerms{value: fee}(signature);
+
+        _handleLogs(account);
+    }
+
     function mintAsAdmin(uint256 adminSeed, uint256 accountSeed) external {
         /// @dev get actors
         address admin = _createOrGetAdmin(adminSeed);
@@ -102,16 +141,21 @@ contract Handler is Test {
         /// @dev sanity conditions
         if (sbt.balanceOf(account) > 0) return;
         _ifBlacklistedThenRemove(admin, account);
-        if (!sbt.getWhitelistEnabled()) _enableWhitelist(admin);
+        if (!sbt.getWhitelistEnabled()) _setWhitelistEnabled(admin, true);
         _ifNotWhitelistedThenAdd(admin, account);
 
         /// @dev update mint ghosts
         _updateMintGhosts(account);
         g_mintAsWhitelistedCalls++;
 
+        /// @dev handle fees and update fee ghosts
+        uint256 fee = sbt.getFee();
+        deal(account, fee);
+        _updateFeeGhosts(fee);
+
         /// @dev mint as whitelisted
         _changePrank(account);
-        sbt.mintAsWhitelisted();
+        sbt.mintAsWhitelisted{value: fee}();
     }
 
     function batchMintAsAdmin(uint256 adminSeed) external {
@@ -131,6 +175,7 @@ contract Handler is Test {
             /// @dev sanity conditions
             _ifBlacklistedThenRemove(admin, account);
             if (sbt.getWhitelistEnabled()) _ifNotWhitelistedThenAdd(admin, account);
+            if (sbt.balanceOf(account) > 0) return;
 
             /// @dev update ghost variables before the call
             _updateMintGhosts(account);
@@ -240,7 +285,7 @@ contract Handler is Test {
         address account = _createAccount(accountSeed);
 
         /// @dev sanity conditions
-        // _ifWhitelistedThenRemove(admin, account);
+        _ifWhitelistedThenRemove(admin, account);
         _ifBlacklistedThenRemove(admin, account);
 
         /// @dev add to blacklist
@@ -262,8 +307,8 @@ contract Handler is Test {
             address account = _createAccount(accountSeed);
 
             /// @dev sanity conditions
-            // _ifWhitelistedThenRemove(admin, account);
             _ifBlacklistedThenRemove(admin, account);
+            _ifWhitelistedThenRemove(admin, account);
             if (g_holders[account]) _updateBurnGhosts(account);
 
             /// @dev add account to batch
@@ -352,10 +397,42 @@ contract Handler is Test {
         sbt.batchSetAdmin(adminsToSet, isAdmin);
     }
 
-    function setBaseURI(bytes32 baseURIBytes32) external {
-        string memory baseURI = string(abi.encodePacked(baseURIBytes32));
+    function setContractURI(bytes32 contractURIBytes32) external {
+        string memory contractURI = string(abi.encodePacked(contractURIBytes32));
         _changePrank(owner);
-        sbt.setBaseURI(baseURI);
+        sbt.setContractURI(contractURI);
+    }
+
+    function withdrawFees(uint256 amountToWithdraw) external {
+        if (address(sbt).balance == 0) return;
+        amountToWithdraw = bound(amountToWithdraw, 1, address(sbt).balance);
+
+        /// @dev update ghosts
+        g_totalFeesWithdrawn += amountToWithdraw;
+
+        _changePrank(owner);
+        sbt.withdrawFees(amountToWithdraw);
+    }
+
+    function setFeeFactor(uint256 adminSeed, uint256 feeFactor) external {
+        /// @dev Bound feeFactor between 0.01 USD (1e16 wei) and 100 USD (1e20 wei)
+        feeFactor = bound(feeFactor, 1e16, 1e20);
+
+        /// @dev get admin
+        address admin = _createOrGetAdmin(adminSeed);
+
+        _changePrank(admin);
+        sbt.setFeeFactor(feeFactor);
+    }
+
+    function changeNativeUsdPrice(uint256 newPrice) external {
+        /// @dev bounding the price between $100 and $10,000
+        uint256 minPrice = 100 * 10 ** 8; // 10,000,000,000
+        uint256 maxPrice = 10000 * 10 ** 8; // 1,000,000,000,000
+        newPrice = bound(newPrice, minPrice, maxPrice);
+
+        int256 updatedAnswer = int256(newPrice);
+        MockV3Aggregator(sbt.getNativeUsdFeed()).updateAnswer(updatedAnswer);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -375,6 +452,10 @@ contract Handler is Test {
         holders.remove(account);
     }
 
+    function _updateFeeGhosts(uint256 fee) internal {
+        g_totalFeesAccumulated += fee;
+    }
+
     function _addToWhitelist(address admin, address account) internal {
         g_whitelisted[account] = true;
         whitelisted.add(account);
@@ -390,9 +471,9 @@ contract Handler is Test {
         sbt.addToBlacklist(account);
     }
 
-    function _enableWhitelist(address admin) internal {
+    function _setWhitelistEnabled(address admin, bool isWhitelistEnabled) internal {
         _changePrank(admin);
-        sbt.setWhitelistEnabled(true);
+        sbt.setWhitelistEnabled(isWhitelistEnabled);
     }
 
     function _ifNotWhitelistedThenAdd(address admin, address account) internal {
@@ -442,15 +523,55 @@ contract Handler is Test {
         sbt.setAdmin(admin, isAdmin);
     }
 
+    function _handleLogs(address account) internal {
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 signatureVerifiedEvent = keccak256("SignatureVerified(address,bytes)");
+
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == signatureVerifiedEvent) {
+                bytes memory emittedSignature = abi.decode(logs[i].data, (bytes));
+                g_emittedSignature[account] = emittedSignature;
+
+                address emittedSigner = address(uint160(uint256(logs[i].topics[1])));
+                assertEq(emittedSigner, account);
+            }
+        }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                                 GETTER
+    //////////////////////////////////////////////////////////////*/
+    function getHoldersLength() external view returns (uint256) {
+        return holders.length();
+    }
+
     /*//////////////////////////////////////////////////////////////
                                 UTILITY
     //////////////////////////////////////////////////////////////*/
+    /// @dev helper function for looping through accounts in the system
+    function forEachAccount(function(address) external func) external {
+        if (accounts.length() == 0) return;
+
+        for (uint256 i; i < accounts.length(); ++i) {
+            func(accounts.at(i));
+        }
+    }
+
     /// @dev helper function for looping through holders in the system
     function forEachHolder(function(address) external func) external {
         if (holders.length() == 0) return;
 
         for (uint256 i; i < holders.length(); ++i) {
             func(holders.at(i));
+        }
+    }
+
+    /// @dev helper function for looping through whitelisted accounts in the system
+    function forEachWhitelisted(function(address) external func) external {
+        if (whitelisted.length() == 0) return;
+
+        for (uint256 i; i < whitelisted.length(); ++i) {
+            func(whitelisted.at(i));
         }
     }
 
@@ -463,10 +584,12 @@ contract Handler is Test {
         }
     }
 
-    /// @dev convert a seed to an address
-    function _seedToAddress(uint256 addressSeed) internal pure returns (address seedAddress) {
-        uint160 boundInt = uint160(bound(addressSeed, 1, type(uint160).max));
-        seedAddress = address(boundInt);
+    /// @dev convert a seed/private key to an address
+    function _seedToAddress(uint256 privateKeySeed) internal returns (address) {
+        uint256 privateKey = bound(privateKeySeed, 1, type(uint256).max / 2);
+        address seedAddress = vm.addr(privateKey);
+        s_accountToPrivateKey[seedAddress] = privateKey;
+        return seedAddress;
     }
 
     /// @dev create an account
@@ -500,6 +623,17 @@ contract Handler is Test {
     function _changePrank(address newPrank) internal {
         vm.stopPrank();
         vm.startPrank(newPrank);
+    }
+
+    function _createSignature(address signer, uint256 signerKey, bytes32 termsHash)
+        internal
+        pure
+        returns (bytes memory)
+    {
+        bytes32 messageHash = keccak256(abi.encodePacked(termsHash, signer));
+        bytes32 ethSignedMessageHash = MessageHashUtils.toEthSignedMessageHash(messageHash);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, ethSignedMessageHash);
+        return abi.encodePacked(r, s, v);
     }
 
     /// @notice empty test to ignore file in coverage report

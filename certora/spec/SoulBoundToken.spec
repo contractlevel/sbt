@@ -17,9 +17,20 @@ methods {
     function getWhitelistEnabled() external returns (bool) envfree;
     function setWhitelistEnabled(bool) external;
     function getTokenIdCounter() external returns (uint256) envfree;
+    function getFee() external returns (uint256) envfree;
+    function getTermsHash() external returns (bytes32) envfree;
+    function contractURI() external returns (string memory) envfree;
+    function getFeeFactor() external returns (uint256) envfree;
+
+    // Summaries
+    function _.latestRoundData() external => DISPATCHER(true);
+    function _.onERC721Received(address,address,uint256,bytes) external => DISPATCHER(true);
 
     // Harness helper functions
     function bytes32ToBool(bytes32) external returns (bool) envfree;
+    function getVerifiedSignature(bytes) external returns (bool);
+    function getSignerSignature(address,bytes) external returns (bool) envfree;
+    function keccakHash(string) external returns (bytes32) envfree;
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -29,7 +40,8 @@ methods {
 definition canMint(method f) returns bool = 
 	f.selector == sig:mintAsAdmin(address).selector || 
 	f.selector == sig:batchMintAsAdmin(address[]).selector ||
-    f.selector == sig:mintAsWhitelisted().selector;
+    f.selector == sig:mintAsWhitelisted().selector ||
+    f.selector == sig:mintWithTerms(bytes).selector;
 
 /// @notice external functions that can burn
 definition canBurn(method f) returns bool = 
@@ -48,13 +60,15 @@ definition onlyAdmin(method f) returns bool =
     f.selector == sig:removeFromBlacklist(address).selector ||
     f.selector == sig:batchRemoveFromBlacklist(address[]).selector ||
     f.selector == sig:mintAsAdmin(address).selector ||
-    f.selector == sig:batchMintAsAdmin(address[]).selector;
+    f.selector == sig:batchMintAsAdmin(address[]).selector ||
+    f.selector == sig:setFeeFactor(uint256).selector;
 
 /// @notice functions that can only be called by the owner
 definition onlyOwner(method f) returns bool = 
     f.selector == sig:setAdmin(address,bool).selector ||
     f.selector == sig:batchSetAdmin(address[],bool).selector ||
-    f.selector == sig:setBaseURI(string).selector;
+    f.selector == sig:setContractURI(string).selector ||
+    f.selector == sig:withdrawFees(uint256).selector;
 
 /// @notice function that take an array of addresses as an argument
 definition batchFunction(method f) returns bool = 
@@ -69,6 +83,11 @@ definition batchFunction(method f) returns bool =
 definition canApprove(method f) returns bool =
     f.selector == sig:approve(address,uint256).selector ||
     f.selector == sig:setApprovalForAll(address,bool).selector;
+
+/// @notice functions that can take a fee
+definition canTakeFee(method f) returns bool =
+    f.selector == sig:mintAsWhitelisted().selector ||
+    f.selector == sig:mintWithTerms(bytes).selector;
 
 definition AddedToWhitelistEvent() returns bytes32 =
 // keccak256(abi.encodePacked("AddedToWhitelist(address)"))
@@ -93,6 +112,33 @@ definition UpdatedWhitelistEnabledEvent() returns bytes32 =
 definition AdminStatusSetEvent() returns bytes32 =
 // keccak256(abi.encodePacked("AdminStatusSet(address,bool)"))
     to_bytes32(0xa8c4c644eea5bad1029a340b24f332f16eeb8ca98e4cb0ce50df3083fc6d40b4);
+
+definition ContractURIUpdatedEvent() returns bytes32 =
+// keccak256(abi.encodePacked("ContractURIUpdated()"))
+    to_bytes32(0xa5d4097edda6d87cb9329af83fb3712ef77eeb13738ffe43cc35a4ce305ad962);
+
+definition TermsHashedEvent() returns bytes32 =
+// keccak256(abi.encodePacked("TermsHashed(bytes32,string)"))
+    to_bytes32(0x1a674a620b6a1af9980f5e0eee7f7e9abf2e21762ce7351b7de5cf2a2e6a573a);
+
+definition FeeCollectedEvent() returns bytes32 =
+// keccak256(abi.encodePacked("FeeCollected(address,uint256,uint256)"))
+    to_bytes32(0x108516ddcf5ba43cea6bb2cd5ff6d59ac196c1c86ccb9178332b9dd72d1ca561);
+
+definition FeesWithdrawnEvent() returns bytes32 =
+// keccak256(abi.encodePacked("FeesWithdrawn(uint256)"))
+    to_bytes32(0x9800e6f57aeb4360eaa72295a820a4293e1e66fbfcabcd8874ae141304a76deb);
+
+definition FeeFactorSetEvent() returns bytes32 =
+// keccak256(abi.encodePacked("FeeFactorSet(uint256)"))
+    to_bytes32(0xa270f34ac428ce8e9c9704e0e87966f3ced6b42d27466392c0df3afbc8448556);
+
+definition SignatureVerifiedEvent() returns bytes32 =
+// keccak256(abi.encodePacked("SignatureVerified(address,bytes)"))
+    to_bytes32(0x8f562c77ebd6f1ba5b4dc787ba60e4fc70d74c739360f09236cf25565c430ec2);
+
+/// @notice number of CALLVALUE opcodes used per mint
+definition MsgValueOpcodePerMint() returns mathint = 3;
 
 /*//////////////////////////////////////////////////////////////
                            FUNCTIONS
@@ -221,9 +267,68 @@ persistent ghost mapping(address => uint256) g_holderToTokenId {
     init_state axiom forall address a. g_holderToTokenId[a] == 0;
 }
 
+/// @notice track amount of fee withdrawal calls
+persistent ghost mathint g_feeWithdrawalCounts {
+    init_state axiom g_feeWithdrawalCounts == 0;
+}
+
+/// @notice track amount FeeCollected event is emitted
+persistent ghost mathint g_feeCollectedEventCount {
+    init_state axiom g_feeCollectedEventCount == 0;
+}
+
+/// @notice track amount FeesWithdrawn event is emitted
+persistent ghost mathint g_feesWithdrawnEventCount {
+    init_state axiom g_feesWithdrawnEventCount == 0;
+}
+
+/// @notice how many times CALLVALUE opcode is used in mints (it should be 3 per mint)
+/// @notice this tracks every single time, so it needs to be divided by MsgValueOpcodePerMint()
+persistent ghost mathint g_callvalueMints {
+    init_state axiom g_callvalueMints == 0;
+}
+
+/// @notice track ContractURIUpdated event emissions
+persistent ghost mathint g_contractURIUpdatedEventCount {
+    init_state axiom g_contractURIUpdatedEventCount == 0;
+}
+
+/// @notice track TermsHashed event emissions
+persistent ghost mathint g_termsHashedEventCount {
+    init_state axiom g_termsHashedEventCount == 0;
+}
+
+/// @notice track s_termsHash updates
+persistent ghost mathint g_termsHashUpdateCount {
+    init_state axiom g_termsHashUpdateCount == 0;
+}
+
+/// @notice track amount FeeFactorSet event is emitted
+persistent ghost mathint g_feeFactorSetEventCount {
+    init_state axiom g_feeFactorSetEventCount == 0;
+}
+
+/// @notice track amount s_feeFactor is modified
+persistent ghost mathint g_feeFactorStorageCount {
+    init_state axiom g_feeFactorStorageCount == 0;
+}
+
 /*//////////////////////////////////////////////////////////////
                              HOOKS
 //////////////////////////////////////////////////////////////*/
+// CALLVALUE opcode is used 3 times per mint, so that must be accounted for with MsgValueOpcodePerMint()
+hook CALLVALUE uint v {
+    if (v > 0) {
+        g_callvalueMints = g_callvalueMints +1;
+    }
+}
+
+hook CALL(uint g, address addr, uint value, uint argsOffset, uint argsLength, uint retOffset, uint retLength) uint rc {
+    if (value > 0 && addr == owner()) {
+        g_feeWithdrawalCounts = g_feeWithdrawalCounts + 1;
+    }
+}
+
 /// @notice update g_totalMinted and g_totalBurned when _allTokens changes
 hook Sstore currentContract._allTokens.length uint256 newValue (uint256 oldValue) {
     if (newValue > oldValue) g_totalMinted = g_totalMinted + newValue - oldValue;
@@ -266,6 +371,11 @@ hook Sstore currentContract.s_whitelistEnabled bool newStatus (bool oldStatus) {
     g_whitelistEnabledStorageCount = g_whitelistEnabledStorageCount + 1;
 }
 
+/// @notice update g_termsHash when s_termsHash is modified
+hook Sstore currentContract.s_termsHash bytes32 newTermsHash (bytes32 oldTermsHash) {
+    g_termsHashUpdateCount = g_termsHashUpdateCount + 1;
+}
+
 /// @notice hook onto emitted events and increment relevant ghosts
 hook LOG2(uint offset, uint length, bytes32 t0, bytes32 t1) {
     if (t0 == AddedToWhitelistEvent()) {
@@ -288,6 +398,17 @@ hook LOG2(uint offset, uint length, bytes32 t0, bytes32 t1) {
         g_updatedWhitelistEnabledEventCount = g_updatedWhitelistEnabledEventCount + 1;
         g_updatedWhitelistEnabledEventParam = bytes32ToBool(t1);
     }
+    if (t0 == FeeCollectedEvent()) {
+        g_feeCollectedEventCount = g_feeCollectedEventCount + 1;
+    }
+    if (t0 == TermsHashedEvent()) g_termsHashedEventCount = g_termsHashedEventCount + 1;
+}
+
+/// @notice hook onto emitted events and increment relevant ghosts
+hook LOG1(uint offset, uint length, bytes32 t0) {
+    if (t0 == FeesWithdrawnEvent()) g_feesWithdrawnEventCount = g_feesWithdrawnEventCount + 1;
+    if (t0 == ContractURIUpdatedEvent()) g_contractURIUpdatedEventCount = g_contractURIUpdatedEventCount + 1;
+    if (t0 == FeeFactorSetEvent()) g_feeFactorSetEventCount = g_feeFactorSetEventCount + 1;
 }
 
 /// @notice hook onto emitted AdminStatusSet event and increment relevant ghost
@@ -296,6 +417,11 @@ hook LOG3(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2) {
         g_adminStatusSetEventCount = g_adminStatusSetEventCount + 1;
         g_adminEventParams[assert_address(t1)] = bytes32ToBool(t2);
     }
+}
+
+/// @notice update g_feeFactorStorageCount when s_feeFactor is modified
+hook Sstore currentContract.s_feeFactor uint256 newValue (uint256 oldValue) {
+    g_feeFactorStorageCount = g_feeFactorStorageCount + 1;
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -331,6 +457,10 @@ invariant noTransfers()
 invariant blacklistedCantBeWhitelisted(address a)
     getBlacklisted(a) => !getWhitelisted(a);
 
+/// @notice whitelisted accounts cannot be blacklisted
+invariant whitelistedCantBeBlacklisted(address a)
+    getWhitelisted(a) => !getBlacklisted(a);
+
 /// @notice total whitelist storage updates should equal sum of AddedToWhitelist and RemovedFromWhitelist events
 invariant whitelist_eventConsistency()
     g_whitelistStorageCount == g_addedToWhitelistEventCount + g_removedFromWhitelistEventCount;
@@ -362,6 +492,42 @@ invariant blacklist_eventParams(address a)
 /// @notice admin status emitted in AdminStatusSet should be consistent with stored value
 invariant admin_eventParams(address a)
     g_adminEventParams[a] == getAdmin(a);
+
+/// @notice everytime a fee is paid, an event should be emitted
+invariant fees_eventConsistency_mints()
+    (g_callvalueMints / MsgValueOpcodePerMint()) == g_feeCollectedEventCount;
+
+/// @notice everytime fees are withdrawn, an event should be emitted
+invariant fees_eventConsistency_withdrawals()
+    g_feeWithdrawalCounts == g_feesWithdrawnEventCount;
+
+/// @notice termsHash should be non-zero when contractURI is too, ie s_contractURI != 0 => s_termsHash != 0;
+invariant termsHash_nonZero()
+    contractURI().length != 0 => bytes32ToBool(getTermsHash());
+
+/// @notice ContractURIUpdated event should be emitted same number of times as TermsHashed event
+invariant contractURIUpdated_eventConsistency()
+    g_contractURIUpdatedEventCount == g_termsHashedEventCount;
+
+/// @notice s_termsHash should be updated same number of times as TermsHashed event
+invariant termsHash_updateConsistency()
+    g_termsHashUpdateCount == g_termsHashedEventCount;
+
+/// @notice FeeFactorSet event should be emitted same number of times as storage updates
+invariant feeFactor_eventConsistency()
+    g_feeFactorStorageCount == g_feeFactorSetEventCount;
+
+/// @notice all tokens should be unique
+invariant tokenIdUniqueness(address a, address b, uint256 i)
+    a != b => tokenOfOwnerByIndex(a, i) != tokenOfOwnerByIndex(b, i) || 
+        tokenOfOwnerByIndex(a, 0) == 0 || tokenOfOwnerByIndex(b, 0) == 0 {
+        preserved {
+            requireInvariant oneTokenPerAccount(a, i);
+            requireInvariant oneTokenPerAccount(b, i);
+            require ownershipConsistency(a, i);
+            require ownershipConsistency(b, i);
+        }
+    }
 
 /*//////////////////////////////////////////////////////////////
                              RULES
@@ -444,6 +610,20 @@ rule approvals_alwaysRevert(method f) filtered {f -> canApprove(f)} {
     calldataarg args;
     f@withrevert(e, args);
     assert lastReverted;
+}
+
+/// @notice functions that can take a fee should increase currentContract.balance
+rule feeCollection_increaseBalance(method f) filtered {f -> canTakeFee(f)} {
+    env e;
+    calldataarg args;
+    require getFee() > 0;
+    require e.msg.sender != currentContract;
+
+    uint256 startBalance = nativeBalances[currentContract];
+
+    f(e, args);
+
+    assert nativeBalances[currentContract] > startBalance;
 }
 
 // ------------------------------------------------------------//
@@ -740,16 +920,6 @@ rule batchRemoveFromBlacklist_success() {
                               MINT
 //////////////////////////////////////////////////////////////*/
 // --- batchMintAsAdmin --- //
-rule batchMintAsAdmin_revertsWhen_notWhitelisted_ifWhitelistEnabled() {
-    env e;
-    address[] a;
-    require getAdmin(e.msg.sender);
-    require getWhitelistEnabled();
-    require !getWhitelisted(a[0]);
-    batchMintAsAdmin@withrevert(e, a);
-    assert lastReverted;
-}
-
 rule batchMintAsAdmin_revertsWhen_blacklisted() {
     env e;
     address[] a;
@@ -804,22 +974,22 @@ rule mintAsAdmin_revertsWhen_alreadyMinted () {
     assert lastReverted;
 }
 
-rule mintAsAdmin_revertsWhen_blacklisted () {
+rule mintAsAdmin_revertsWhen_zeroAddress () {
     env e;
-    address a;
+    address a = 0;
     require getAdmin(e.msg.sender);
-    require getBlacklisted(a);
+    require !getBlacklisted(a);
+    require balanceOf(a) == 0;
 
     mintAsAdmin@withrevert(e, a);
     assert lastReverted;
 }
 
-rule mintAsAdmin_revertsWhen_notWhitelistedWhenEnabled () {
+rule mintAsAdmin_revertsWhen_blacklisted () {
     env e;
     address a;
     require getAdmin(e.msg.sender);
-    require getWhitelistEnabled();
-    require !getWhitelisted(a);
+    require getBlacklisted(a);
 
     mintAsAdmin@withrevert(e, a);
     assert lastReverted;
@@ -835,18 +1005,20 @@ rule mintAsAdmin_success () {
 // --- mintAsWhitelisted --- //
 rule mintAsWhitelisted_revertsWhen_whitelistDisabled() {
     env e;
-    calldataarg args;
-    require !getWhitelistEnabled();
+    require e.msg.value >= getFee();
+    require getWhitelisted(e.msg.sender);
 
-    mintAsWhitelisted@withrevert(e, args);
+    require !getWhitelistEnabled();
+    mintAsWhitelisted@withrevert(e);
     assert lastReverted;
 }
 
 rule mintAsWhitelisted_revertsWhen_notWhitelisted() {
     env e;
     require getWhitelistEnabled();
-    require !getWhitelisted(e.msg.sender);
+    require e.msg.value >= getFee();
 
+    require !getWhitelisted(e.msg.sender);
     mintAsWhitelisted@withrevert(e);
     assert lastReverted;
 }
@@ -855,16 +1027,77 @@ rule mintAsWhitelisted_revertsWhen_alreadyMinted() {
     env e;
     require getWhitelistEnabled();
     require getWhitelisted(e.msg.sender);
-    require balanceOf(e.msg.sender) > 0;
+    require e.msg.value >= getFee();
 
+    require balanceOf(e.msg.sender) > 0;
+    mintAsWhitelisted@withrevert(e);
+    assert lastReverted;
+}
+
+rule mintAsWhitelisted_revertsWhen_insufficientFee() {
+    env e;
+    require getWhitelistEnabled();
+    require getWhitelisted(e.msg.sender);
+
+    require e.msg.value < getFee();
     mintAsWhitelisted@withrevert(e);
     assert lastReverted;
 }
 
 rule mintAsWhitelisted_success() {
     env e;
+    uint256 startBalance = nativeBalances[currentContract];
+
     mintAsWhitelisted(e);
+
     assert balanceOf(e.msg.sender) == 1;
+    assert nativeBalances[currentContract] >= startBalance;
+}
+
+// --- mintWithTerms --- //
+rule mintWithTerms_revertsWhen_blacklisted() {
+    env e;
+    calldataarg args;
+    require e.msg.value >= getFee();
+    
+    require getBlacklisted(e.msg.sender);
+    mintWithTerms@withrevert(e, args);
+    assert lastReverted;
+}
+
+rule mintWithTerms_revertsWhen_insufficientFee() {
+    env e;
+    calldataarg args;
+    require !getBlacklisted(e.msg.sender);
+    require getFee() > 0;
+    
+    require e.msg.value < getFee();
+    mintWithTerms@withrevert(e, args);
+    assert lastReverted;
+}
+
+rule mintWithTerms_revertsWhen_invalidSignature() {
+    env e;
+    bytes s;
+    require !getBlacklisted(e.msg.sender);
+    require getFee() > 0;
+    require e.msg.value >= getFee();
+
+    require !getVerifiedSignature(e, s);
+    mintWithTerms@withrevert(e, s);
+    assert lastReverted;
+}
+
+rule mintWithTerms_success() {
+    env e;
+    bytes s;
+    uint256 startBalance = nativeBalances[currentContract];
+
+    mintWithTerms(e, s);
+
+    assert balanceOf(e.msg.sender) == 1;
+    assert nativeBalances[currentContract] >= startBalance;
+    assert getSignerSignature(e.msg.sender, s);
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -934,4 +1167,103 @@ rule batchSetAdmin_success() {
     batchSetAdmin(e, a, isAdmin);
 
     assert forall uint256 i. i < a.length => g_admins[a[i]] == isAdmin;
+}
+
+/*//////////////////////////////////////////////////////////////
+                         SET FEE FACTOR
+//////////////////////////////////////////////////////////////*/
+rule setFeeFactor_revertsWhen_notAdmin() {
+    env e;
+    calldataarg args;
+    require !getAdmin(e.msg.sender);
+
+    setFeeFactor@withrevert(e, args);
+    assert lastReverted;
+}
+
+rule setFeeFactor_success() {
+    env e;
+    uint256 num;
+    setFeeFactor(e, num);
+    assert num == getFeeFactor();
+}
+
+/*//////////////////////////////////////////////////////////////
+                         WITHDRAW FEES
+//////////////////////////////////////////////////////////////*/
+rule withdrawFees_revertsWhen_notOwner() {
+    env e;
+    uint256 amountToWithdraw;
+    require amountToWithdraw > 0;
+    require nativeBalances[currentContract] >= amountToWithdraw;
+
+    require e.msg.sender != owner();
+    withdrawFees@withrevert(e, amountToWithdraw);
+    assert lastReverted;
+}
+
+rule withdrawFees_revertsWhen_zeroAmount() {
+    env e;
+    uint256 amountToWithdraw;
+    require e.msg.sender == owner();
+    require nativeBalances[currentContract] > amountToWithdraw;
+
+    require amountToWithdraw == 0;
+    withdrawFees@withrevert(e, amountToWithdraw);
+    assert lastReverted;
+}
+
+rule withdrawFees_revertsWhen_insufficientBalance() {
+    env e;
+    uint256 amountToWithdraw;
+    require e.msg.sender == owner();
+    require amountToWithdraw > 0;
+
+    require nativeBalances[currentContract] < amountToWithdraw;
+    withdrawFees@withrevert(e, amountToWithdraw);
+    assert lastReverted;
+}
+
+rule withdrawFees_success() {
+    env e;
+    uint256 amountToWithdraw;
+
+    uint256 contractBalanceBefore = nativeBalances[currentContract];
+    uint256 ownerBalanceBefore = nativeBalances[owner()];
+
+    withdrawFees(e, amountToWithdraw);
+
+    uint256 contractBalanceAfter = nativeBalances[currentContract];
+    uint256 ownerBalanceAfter = nativeBalances[owner()];
+
+    assert contractBalanceAfter == contractBalanceBefore - amountToWithdraw;
+    assert ownerBalanceAfter == ownerBalanceBefore + amountToWithdraw;
+}
+
+/*//////////////////////////////////////////////////////////////
+                        SET CONTRACT URI
+//////////////////////////////////////////////////////////////*/
+/// @notice setContractURI should revert when called by non-owner
+rule setContractURI_revertsWhen_notOwner() {
+    env e;
+    calldataarg args;
+    require e.msg.sender != owner();
+    setContractURI@withrevert(e, args);
+    assert lastReverted;
+}
+
+/// @notice setContractURI should hash terms
+rule setContractURI_updatesTermsHashCorrectly(string newContractURI) {
+    env e;
+
+    // Call setContractURI with the new contractURI
+    setContractURI(e, newContractURI);
+
+    // Get the updated values
+    string updatedContractURI = contractURI(e);
+    bytes32 updatedTermsHash = getTermsHash(e);
+
+    assert updatedContractURI == newContractURI, "Contract URI not set correctly";
+    assert updatedTermsHash == keccakHash(newContractURI), "Terms hash not updated correctly";
+    assert keccakHash(updatedContractURI) == updatedTermsHash, "Invariant violated";
 }

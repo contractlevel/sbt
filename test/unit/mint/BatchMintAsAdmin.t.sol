@@ -12,13 +12,6 @@ contract BatchMintAsAdminTest is BaseTest {
         sbt.batchMintAsAdmin(accounts);
     }
 
-    function test_sbt_batchMintAsAdmin_revertsWhen_notWhitelisted() public {
-        address[] memory accounts = new address[](1);
-        accounts[0] = notWhitelisted;
-        vm.expectRevert(abi.encodeWithSignature("SoulBoundToken__NotWhitelisted(address)", notWhitelisted));
-        sbt.batchMintAsAdmin(accounts);
-    }
-
     function test_sbt_batchMintAsAdmin_revertsWhen_blacklisted() public {
         _whitelistEnabled(false);
         address[] memory accounts = new address[](1);

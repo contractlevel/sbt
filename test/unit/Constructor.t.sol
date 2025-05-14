@@ -7,9 +7,10 @@ contract ConstructorTest is BaseTest {
     function test_sbt_constructor() public view {
         assertEq(name, sbt.name());
         assertEq(symbol, sbt.symbol());
-        assertEq(baseURI, sbt.getBaseURI());
+        assertEq(contractURI, sbt.contractURI());
         assertEq(whitelistEnabled, sbt.getWhitelistEnabled());
         assertEq(sbt.getTokenIdCounter(), 1);
         assertEq(sbt.owner(), owner);
+        assertEq(nativeUsdFeed, sbt.getNativeUsdFeed());
     }
 }

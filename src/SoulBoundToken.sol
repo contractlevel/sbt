@@ -8,16 +8,21 @@ import {
 } from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {ISoulBoundToken} from "./interfaces/ISoulBoundToken.sol";
 
 /// @title SoulBoundToken
 /// @author @contractlevel
 /// @notice Non-transferrable ERC721 token with administrative whitelist and blacklist functionality
 /// @notice System Actors: Owner, Admins, Whitelisted, Blacklisted
-/// @dev Owner - sets admin role and base URI
+/// @dev Owner - sets admin role and contract URI
 /// @dev Admins - set whitelisted and blacklisted roles, and enables/disables whitelist
 /// @dev Whitelisted - can mint a token if whitelist is enabled
 /// @dev Blacklisted - if held token, then burnt, and if whitelisted, then removed, and cant be whitelisted or minted
+/// @notice Non-whitelisted users can mint tokens if they sign a message agreeing with Terms of Service
+/// @notice Fees are enforced on all user mints, and set by admins
 contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
@@ -35,14 +40,31 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     error SoulBoundToken__AdminStatusAlreadySet(address account, bool isAdmin);
     error SoulBoundToken__AlreadyMinted(address account);
     error SoulBoundToken__EmptyArray();
+    error SoulBoundToken__WhitelistEnabled();
+    error SoulBoundToken__InvalidSignature();
+    error SoulBoundToken__InsufficientFee();
+    error SoulBoundToken__WithdrawFailed();
+    error SoulBoundToken__NoZeroValue();
+    error SoulBoundToken__InsufficientBalance();
 
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
     //////////////////////////////////////////////////////////////*/
+    /// @dev Chainlink price feeds return answers with 8 decimals so we need this to calculate fee
+    uint256 internal constant PRICE_FEED_PRECISION = 10 ** 8;
+
+    /// @dev Chainlink price feed for native/USD
+    AggregatorV3Interface internal immutable i_nativeUsdFeed;
+
+    /// @dev Hash of contract URI (which is intended to be IPFS resource for Terms of Service)
+    bytes32 internal s_termsHash;
+    /// @dev Admin-configurable value used to calculate mint fee
+    /// @notice This value should be in USD with 18 decimals. ie 1 USD = 1e18 (1000000000000000000)
+    uint256 internal s_feeFactor;
     /// @dev Token counter for minting
     uint256 internal s_tokenIdCounter;
-    /// @dev Base URI for token metadata
-    string internal s_baseURI;
+    /// @dev Contract URI for token metadata
+    string internal s_contractURI;
     /// @dev Mapping for whitelist
     mapping(address account => bool isWhitelisted) internal s_whitelist;
     /// @dev Mapping for blacklist
@@ -60,8 +82,13 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     event AddedToBlacklist(address indexed account);
     event RemovedFromBlacklist(address indexed account);
     event UpdatedWhitelistEnabled(bool indexed isWhitelistEnabled);
-    event UpdatedBaseURI(string newBaseURI);
+    event ContractURIUpdated();
     event AdminStatusSet(address indexed account, bool indexed isAdmin);
+    event TermsHashed(bytes32 indexed hashedTerms, string contractURI);
+    event FeeCollected(address indexed user, uint256 amount, uint256 tokenId);
+    event FeesWithdrawn(uint256 amount);
+    event FeeFactorSet(uint256 feeFactor);
+    event SignatureVerified(address indexed signer, bytes signature);
 
     /*//////////////////////////////////////////////////////////////
                                MODIFIERS
@@ -77,16 +104,24 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     //////////////////////////////////////////////////////////////*/
     /// @param name The name of the token
     /// @param symbol The symbol of the token
-    /// @param baseURI The base URI for the token
+    /// @param initialContractURI The contract URI for the token
     /// @param whitelistEnabled Whether the whitelist is enabled
+    /// @param nativeUsdFeed The address of the native/USD Chainlink price feed
+    /// @param owner The owner of the contract
     /// @dev Initializes the token ID counter to 1
-    constructor(string memory name, string memory symbol, string memory baseURI, bool whitelistEnabled)
-        ERC721(name, symbol)
-        Ownable(msg.sender)
-    {
-        _setBaseURI(baseURI);
+    constructor(
+        string memory name,
+        string memory symbol,
+        string memory initialContractURI,
+        bool whitelistEnabled,
+        address nativeUsdFeed,
+        address owner
+    ) ERC721(name, symbol) Ownable(owner) {
+        _setContractURI(initialContractURI);
         _setWhitelistEnabled(whitelistEnabled);
         s_tokenIdCounter = 1;
+        i_nativeUsdFeed = AggregatorV3Interface(nativeUsdFeed);
+        _hashTerms(initialContractURI);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -95,7 +130,6 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @dev Mints a new token to the specified address
     /// @param account Address to mint the token to
     /// @return uint256 The ID of the minted token
-    /// @dev Revert if account is not whitelisted when whitelist is enabled
     /// @dev Revert if account is blacklisted
     /// @dev Revert if account already holds a token
     /// @notice ERC721 reverts if account == zero address
@@ -108,7 +142,6 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @param accounts Addresses to mint the tokens to
     /// @return uint256[] The IDs of the minted tokens
     /// @dev Revert if accounts array is empty
-    /// @dev Revert if any of the accounts are not whitelisted when whitelist is enabled
     /// @dev Revert if any of the accounts are blacklisted
     /// @dev Revert if any of the accounts already hold a token
     /// @notice ERC721 reverts if any of the accounts == zero address
@@ -127,15 +160,42 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     }
 
     /// @dev Mints a new token to the msg.sender if they are whitelisted
-    /// @return uint256 The ID of the minted token
+    /// @return tokenId The ID of the minted token
     /// @dev Revert if whitelist is disabled
     /// @dev Revert if msg.sender is not whitelisted
     /// @dev Revert if msg.sender already holds a token
-    function mintAsWhitelisted() external returns (uint256) {
+    /// @notice The msg.value can be higher than the fee, excess value will be kept by the contract
+    function mintAsWhitelisted() external payable returns (uint256 tokenId) {
+        _revertIfInsufficientFee();
         if (!_isWhitelistEnabled()) revert SoulBoundToken__WhitelistDisabled();
         _revertIfNotWhitelisted(msg.sender);
         _revertIfAlreadyMinted(msg.sender);
-        return _mintSoulBoundToken(msg.sender);
+        tokenId = _mintSoulBoundToken(msg.sender);
+        /// @notice the condition for emitting this event may not be optimal in terms of readability
+        /// if someone pays a higher fee than is required
+        /// but other than that it is functionally correct and efficient in terms of gas
+        if (msg.value > 0) emit FeeCollected(msg.sender, msg.value, tokenId);
+    }
+
+    /// @dev Mints a new token to the msg.sender if they sign the termsHash
+    /// @notice This function requires a signature from the msg.sender, including the hash of this token's contract URI
+    /// The contract URI is intended to be an IPFS reference containing Terms of Service for token holders.
+    /// @param signature Signed by msg.sender with Terms of Service hash
+    /// @dev Revert if insufficient fee (ie msg.value is less than getFee())
+    /// @dev Revert if signature is invalid
+    /// @dev Revert if msg.sender already holds a token
+    /// @notice The msg.value can be higher than the fee, excess value will be kept by the contract
+    function mintWithTerms(bytes memory signature) external payable returns (uint256 tokenId) {
+        _revertIfInsufficientFee();
+        _revertIfBlacklisted(msg.sender);
+        _revertIfAlreadyMinted(msg.sender);
+
+        if (!_verifySignature(signature)) revert SoulBoundToken__InvalidSignature();
+        else emit SignatureVerified(msg.sender, signature);
+
+        tokenId = _mintSoulBoundToken(msg.sender);
+
+        if (msg.value > 0) emit FeeCollected(msg.sender, msg.value, tokenId);
     }
 
     /// @dev Adds an address to the whitelist
@@ -245,6 +305,21 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
         }
     }
 
+    /// @notice Owner only function for withdrawing fees
+    /// @param amountToWithdraw The amount of address(this).balance to withdraw
+    /// @dev Revert if caller is not owner
+    /// @dev Revert if amountToWithdraw is 0
+    /// @dev Revert if amountToWithdraw is more than contract balance
+    //slither-disable-next-line reentrancy-events
+    function withdrawFees(uint256 amountToWithdraw) external onlyOwner {
+        if (amountToWithdraw == 0) revert SoulBoundToken__NoZeroValue();
+        if (amountToWithdraw > address(this).balance) revert SoulBoundToken__InsufficientBalance();
+        //slither-disable-next-line low-level-calls
+        (bool success,) = payable(msg.sender).call{value: amountToWithdraw}("");
+        if (!success) revert SoulBoundToken__WithdrawFailed();
+        emit FeesWithdrawn(amountToWithdraw);
+    }
+
     /*//////////////////////////////////////////////////////////////
                                 INTERNAL
     //////////////////////////////////////////////////////////////*/
@@ -268,18 +343,16 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     }
 
     /// @param account Address to check
-    /// @dev Revert if account is not whitelisted when whitelist is enabled
     /// @dev Revert if account is blacklisted
     function _mintAsAdminChecks(address account) internal view {
         _revertIfAlreadyMinted(account);
-        if (_isWhitelistEnabled()) _revertIfNotWhitelisted(account);
         _revertIfBlacklisted(account);
     }
 
     /// @dev Mints a new token to the specified address
     /// @param account Address to mint the token to
     /// @return uint256 The ID of the minted token
-    /// @dev Revert if account is not whitelisted when whitelist is enabled
+    /// @dev Revert if account already holds a token
     /// @dev Revert if account is blacklisted
     function _mintAsAdmin(address account) internal returns (uint256) {
         _mintAsAdminChecks(account);
@@ -378,11 +451,11 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
         emit UpdatedWhitelistEnabled(whitelistEnabled);
     }
 
-    /// @dev Sets the base URI for token metadata
-    /// @param baseURI New base URI
-    function _setBaseURI(string memory baseURI) internal {
-        s_baseURI = baseURI;
-        emit UpdatedBaseURI(baseURI);
+    /// @dev Sets the contract URI for token metadata
+    /// @param newContractURI New contract URI
+    function _setContractURI(string memory newContractURI) internal {
+        s_contractURI = newContractURI;
+        emit ContractURIUpdated();
     }
 
     /// @dev Check if whitelist is enabled
@@ -401,18 +474,73 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
         emit AdminStatusSet(account, isAdmin);
     }
 
+    /// @notice This function verifies whether a signature is valid or not
+    /// @param signature Signed and passed by the user when minting
+    /// @return isValid True if the signature is valid, false if not
+    function _verifySignature(bytes memory signature) internal view returns (bool) {
+        /// @dev compute the message hash: keccak256(termsHash, msg.sender)
+        bytes32 messageHash = keccak256(abi.encodePacked(s_termsHash, msg.sender));
+
+        /// @dev apply Ethereum signed message prefix
+        bytes32 ethSignedMessageHash = MessageHashUtils.toEthSignedMessageHash(messageHash);
+
+        /// @dev attempt to recover the signer
+        //slither-disable-next-line unused-return
+        (address recovered, ECDSA.RecoverError error,) = ECDSA.tryRecover(ethSignedMessageHash, signature);
+
+        /// @dev return false if errors or incorrect signer
+        return error == ECDSA.RecoverError.NoError && recovered == msg.sender;
+    }
+
+    /// @param newContractURI SBT contract URI (intended to be IPFS resource)
+    /// @dev Hashes the contractURI and stores it
+    function _hashTerms(string memory newContractURI) internal {
+        bytes32 hashedTerms = keccak256(abi.encodePacked(newContractURI));
+        s_termsHash = hashedTerms;
+        emit TermsHashed(hashedTerms, newContractURI);
+    }
+
+    /// @dev reverts if msg.value is less than fee
+    function _revertIfInsufficientFee() internal view {
+        if (msg.value < _getFee()) revert SoulBoundToken__InsufficientFee();
+    }
+
+    /// @dev returns the latest native/USD price
+    function _getLatestPrice() internal view returns (uint256) {
+        //slither-disable-next-line unused-return
+        (, int256 price,,,) = i_nativeUsdFeed.latestRoundData();
+        return uint256(price);
+    }
+
+    /// @dev gets the fee for minting
+    function _getFee() internal view returns (uint256) {
+        uint256 feeFactor = s_feeFactor;
+        if (feeFactor == 0) return 0;
+        else return (feeFactor * PRICE_FEED_PRECISION) / _getLatestPrice();
+    }
+
     /*//////////////////////////////////////////////////////////////
                                  SETTER
     //////////////////////////////////////////////////////////////*/
-    /// @dev Sets the base URI for token metadata
-    /// @param baseURI New base URI
-    function setBaseURI(string memory baseURI) external onlyOwner {
-        _setBaseURI(baseURI);
+    /// @dev Sets the contract URI for token metadata
+    /// @param newContractURI New contract URI
+    function setContractURI(string memory newContractURI) external onlyOwner {
+        _setContractURI(newContractURI);
+        _hashTerms(newContractURI);
     }
 
     /// @dev Sets whitelist to enabled
     function setWhitelistEnabled(bool whitelistEnabled) external onlyAdmin {
         _setWhitelistEnabled(whitelistEnabled);
+    }
+
+    /// @dev Sets the factor used for calculating the fee
+    /// @param newFeeFactor the new factor value used for calculating the fee
+    /// @notice This is an admin only function
+    /// @dev This value should be in USD with 18 decimals. ie 1 USD = 1e18 (1000000000000000000)
+    function setFeeFactor(uint256 newFeeFactor) external onlyAdmin {
+        s_feeFactor = newFeeFactor;
+        emit FeeFactorSet(newFeeFactor);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -445,10 +573,10 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
         return _isWhitelistEnabled();
     }
 
-    /// @dev Returns the base URI for token metadata
-    /// @return string The base URI
-    function getBaseURI() external view returns (string memory) {
-        return _baseURI();
+    /// @dev Returns the contract URI for token metadata
+    /// @return string The contract URI
+    function contractURI() external view returns (string memory) {
+        return _contractURI();
     }
 
     /// @return tokenIdCounter token ID for the next token to be minted
@@ -456,13 +584,33 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
         return s_tokenIdCounter;
     }
 
+    /// @return fee msg.value amount required for minting
+    function getFee() external view returns (uint256) {
+        return _getFee();
+    }
+
+    /// @return termsHash This is a hash of the contract URI which should be used when signing a message to mint with terms
+    function getTermsHash() external view returns (bytes32) {
+        return s_termsHash;
+    }
+
+    /// @return nativeUsdFeed Chainlink price feed for native/USD used to calculate fee
+    function getNativeUsdFeed() external view returns (address) {
+        return address(i_nativeUsdFeed);
+    }
+
+    /// @return feeFactor The value set by admins to calculate fee price
+    function getFeeFactor() external view returns (uint256) {
+        return s_feeFactor;
+    }
+
     /*//////////////////////////////////////////////////////////////
                                 OVERRIDE
     //////////////////////////////////////////////////////////////*/
-    /// @dev Returns the base URI for token metadata
-    /// @return string The base URI
-    function _baseURI() internal view override returns (string memory) {
-        return s_baseURI;
+    /// @dev Returns the contract URI for token metadata
+    /// @return string The contract URI
+    function _contractURI() internal view returns (string memory) {
+        return s_contractURI;
     }
 
     /// @dev Override to prevent approval for non-transferrable tokens
