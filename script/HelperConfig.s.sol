@@ -48,7 +48,7 @@ contract HelperConfig is Script {
             symbol: "EVO",
             contractURI: "ipfs://QmfKN2Cq3HSNXVr36MXHdRMvH2PDrby3y1cH1aRFbTkf4C/", // dummy value, replace in production
             whitelistEnabled: true,
-            nativeUsdFeed: 0x694AA1769357215DE4FAC081bf1f309aDC325306, // https://docs.chain.link/data-feeds/price-feeds/addresses?page=1&network=optimism&search=eth
+            nativeUsdFeed: 0x694AA1769357215DE4FAC081bf1f309aDC325306,
             owner: address(1) // dummy value, replace in production
         });
     }
