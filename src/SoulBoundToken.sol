@@ -106,6 +106,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @param symbol The symbol of the token
     /// @param initialContractURI The contract URI for the token
     /// @param whitelistEnabled Whether the whitelist is enabled
+    /// @param nativeUsdFeed The address of the native/USD Chainlink price feed
     /// @dev Initializes the token ID counter to 1
     constructor(
         string memory name,
@@ -161,6 +162,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @dev Revert if whitelist is disabled
     /// @dev Revert if msg.sender is not whitelisted
     /// @dev Revert if msg.sender already holds a token
+    /// @notice The msg.value can be higher than the fee, excess value will be kept by the contract
     function mintAsWhitelisted() external payable returns (uint256 tokenId) {
         _revertIfInsufficientFee();
         if (!_isWhitelistEnabled()) revert SoulBoundToken__WhitelistDisabled();
@@ -179,6 +181,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @dev Revert if whitelist is enabled
     /// @dev Revert if signature is invalid
     /// @dev Revert if msg.sender already holds a token
+    /// @notice The msg.value can be higher than the fee, excess value will be kept by the contract
     function mintWithTerms(bytes memory signature) external payable returns (uint256 tokenId) {
         _revertIfInsufficientFee();
         _revertIfBlacklisted(msg.sender);
@@ -307,9 +310,11 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @dev Revert if caller is not owner
     /// @dev Revert if amountToWithdraw is 0
     /// @dev Revert if amountToWithdraw is more than contract balance
+    //slither-disable-next-line reentrancy-events
     function withdrawFees(uint256 amountToWithdraw) external onlyOwner {
         if (amountToWithdraw == 0) revert SoulBoundToken__NoZeroValue();
         if (amountToWithdraw > address(this).balance) revert SoulBoundToken__InsufficientBalance();
+        //slither-disable-next-line low-level-calls
         (bool success,) = payable(msg.sender).call{value: amountToWithdraw}("");
         if (!success) revert SoulBoundToken__WithdrawFailed();
         emit FeesWithdrawn(amountToWithdraw);
@@ -480,9 +485,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
         bytes32 ethSignedMessageHash = MessageHashUtils.toEthSignedMessageHash(messageHash);
 
         /// @dev attempt to recover the signer
-        // SoulBoundToken._verifySignature(bytes,bytes32) (src/extensions/SoulBoundToken.sol#102-115) ignores return value
-        // by (recovered,error,None) = ECDSA.tryRecover(ethSignedMessageHash,signature) (src/extensions/SoulBoundToken.sol#110)
-        // Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#unused-return
+        //slither-disable-next-line unused-return
         (address recovered, ECDSA.RecoverError error,) = ECDSA.tryRecover(ethSignedMessageHash, signature);
 
         /// @dev return false if errors or incorrect signer

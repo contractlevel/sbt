@@ -282,6 +282,12 @@ export CERTORAKEY=<YOUR_KEY_HERE>
 certoraRun ./certora/conf/SoulBoundToken.conf
 ```
 
+A separate specification file is used for the `FeesAccountancy` invariant. This is because we needed to summarize the `_verifySignature()` logic in order to prevent the prover from auto havocing `onERC721Received()`. For some reason the full `_verifySignature()` causes the prover to havoc `onERC721Received()` even though we have used a dispatcher summary and included its implementation in our scene. To verify this invariant, run the following configuration:
+
+```
+certoraRun ./certora/conf/FeesAccountancy.conf
+```
+
 ## Important Notes
 
 - **Non-transferrable Tokens**: Tokens cannot be transferred. Attempts to call `transferFrom`, `approve`, or `setApprovalForAll` will revert with `SoulBoundToken__TransferNotAllowed` or `SoulBoundToken__ApprovalNotAllowed`.

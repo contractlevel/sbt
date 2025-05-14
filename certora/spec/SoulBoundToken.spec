@@ -113,7 +113,6 @@ definition AdminStatusSetEvent() returns bytes32 =
 // keccak256(abi.encodePacked("AdminStatusSet(address,bool)"))
     to_bytes32(0xa8c4c644eea5bad1029a340b24f332f16eeb8ca98e4cb0ce50df3083fc6d40b4);
 
-// @review - unused
 definition ContractURIUpdatedEvent() returns bytes32 =
 // keccak256(abi.encodePacked("ContractURIUpdated()"))
     to_bytes32(0xa5d4097edda6d87cb9329af83fb3712ef77eeb13738ffe43cc35a4ce305ad962);
@@ -138,6 +137,7 @@ definition SignatureVerifiedEvent() returns bytes32 =
 // keccak256(abi.encodePacked("SignatureVerified(address,bytes)"))
     to_bytes32(0x8f562c77ebd6f1ba5b4dc787ba60e4fc70d74c739360f09236cf25565c430ec2);
 
+/// @notice number of CALLVALUE opcodes used per mint
 definition MsgValueOpcodePerMint() returns mathint = 3;
 
 /*//////////////////////////////////////////////////////////////
@@ -267,16 +267,6 @@ persistent ghost mapping(address => uint256) g_holderToTokenId {
     init_state axiom forall address a. g_holderToTokenId[a] == 0;
 }
 
-// /// @notice track total fees accumulated
-// persistent ghost mathint g_totalFeesAccumulated {
-//     axiom g_totalFeesAccumulated = g_totalCallvaluePreDivision / MsgValueOpcodePerMint();
-// }
-
-/// @notice track total fees withdrawn
-persistent ghost mathint g_totalFeesWithdrawn {
-    init_state axiom g_totalFeesWithdrawn == 0;
-}
-
 /// @notice track amount of fee withdrawal calls
 persistent ghost mathint g_feeWithdrawalCounts {
     init_state axiom g_feeWithdrawalCounts == 0;
@@ -298,9 +288,19 @@ persistent ghost mathint g_callvalueMints {
     init_state axiom g_callvalueMints == 0;
 }
 
-/// @notice this tracks the total value of CALLVALUE opcodes used in mints, and must be divided by MsgValueOpcodePerMint()
-persistent ghost mathint g_totalCallvaluePreDivision {
-    init_state axiom g_totalCallvaluePreDivision == 0;
+/// @notice track ContractURIUpdated event emissions
+persistent ghost mathint g_contractURIUpdatedEventCount {
+    init_state axiom g_contractURIUpdatedEventCount == 0;
+}
+
+/// @notice track TermsHashed event emissions
+persistent ghost mathint g_termsHashedEventCount {
+    init_state axiom g_termsHashedEventCount == 0;
+}
+
+/// @notice track s_termsHash
+persistent ghost bytes32 g_termsHash {
+    init_state axiom g_termsHash == bytes32(0);
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -309,15 +309,12 @@ persistent ghost mathint g_totalCallvaluePreDivision {
 // CALLVALUE opcode is used 3 times per mint, so that must be accounted for with MsgValueOpcodePerMint()
 hook CALLVALUE uint v {
     if (v > 0) {
-        // g_totalFeesAccumulated = g_totalFeesAccumulated + to_mathint(v);
-        g_totalCallvaluePreDivision = g_totalCallvaluePreDivision + to_mathint(v);
         g_callvalueMints = g_callvalueMints +1;
     }
 }
 
 hook CALL(uint g, address addr, uint value, uint argsOffset, uint argsLength, uint retOffset, uint retLength) uint rc {
-    if (value > 0 && addr != currentContract) {
-        g_totalFeesWithdrawn = g_totalFeesWithdrawn + to_mathint(value);
+    if (value > 0 && addr == owner()) {
         g_feeWithdrawalCounts = g_feeWithdrawalCounts + 1;
     }
 }
@@ -364,6 +361,11 @@ hook Sstore currentContract.s_whitelistEnabled bool newStatus (bool oldStatus) {
     g_whitelistEnabledStorageCount = g_whitelistEnabledStorageCount + 1;
 }
 
+/// @notice update g_termsHash when s_termsHash is modified
+hook Sstore currentContract.s_termsHash bytes32 newTermsHash (bytes32 oldTermsHash) {
+    g_termsHash = newTermsHash;
+}
+
 /// @notice hook onto emitted events and increment relevant ghosts
 hook LOG2(uint offset, uint length, bytes32 t0, bytes32 t1) {
     if (t0 == AddedToWhitelistEvent()) {
@@ -389,11 +391,13 @@ hook LOG2(uint offset, uint length, bytes32 t0, bytes32 t1) {
     if (t0 == FeeCollectedEvent()) {
         g_feeCollectedEventCount = g_feeCollectedEventCount + 1;
     }
+    if (t0 == TermsHashedEvent()) g_termsHashedEventCount = g_termsHashedEventCount + 1;
 }
 
-/// @notice hook onto emitted FeesWithdrawn event and increment relevant ghost
+/// @notice hook onto emitted events and increment relevant ghosts
 hook LOG1(uint offset, uint length, bytes32 t0) {
     if (t0 == FeesWithdrawnEvent()) g_feesWithdrawnEventCount = g_feesWithdrawnEventCount + 1;
+    if (t0 == ContractURIUpdatedEvent()) g_contractURIUpdatedEventCount = g_contractURIUpdatedEventCount + 1;
 }
 
 /// @notice hook onto emitted AdminStatusSet event and increment relevant ghost
@@ -481,16 +485,25 @@ invariant fees_eventConsistency_mints()
 invariant fees_eventConsistency_withdrawals()
     g_feeWithdrawalCounts == g_feesWithdrawnEventCount;
 
-// @review - failing because havocing onERC721Received
-// WHY is it havocing for mintWithTerms but not mintAsWhitelisted?????
-/// @notice the balance of the SBT contract should always cover the accumulated fees minus fees withdrawn
-invariant feesAccountancy()
-    nativeBalances[currentContract] >= 
-        (g_totalCallvaluePreDivision / MsgValueOpcodePerMint()) - g_totalFeesWithdrawn;
-
 /// @notice termsHash should be non-zero when contractURI is too, ie s_contractURI != 0 => s_termsHash != 0;
 invariant termsHash_nonZero()
     contractURI().length != 0 => bytes32ToBool(getTermsHash());
+
+/// @notice ContractURIUpdated event should be emitted same number of times as TermsHashed event
+invariant contractURIUpdated_eventConsistency()
+    g_contractURIUpdatedEventCount == g_termsHashedEventCount;
+
+/// @notice all tokens should be unique
+invariant tokenIdUniqueness(address a, address b, uint256 i)
+    a != b => tokenOfOwnerByIndex(a, i) != tokenOfOwnerByIndex(b, i) || 
+        tokenOfOwnerByIndex(a, 0) == 0 || tokenOfOwnerByIndex(b, 0) == 0 {
+        preserved {
+            requireInvariant oneTokenPerAccount(a, i);
+            requireInvariant oneTokenPerAccount(b, i);
+            require ownershipConsistency(a, i);
+            require ownershipConsistency(b, i);
+        }
+    }
 
 /*//////////////////////////////////////////////////////////////
                              RULES
@@ -932,6 +945,17 @@ rule mintAsAdmin_revertsWhen_alreadyMinted () {
     address a;
     require getAdmin(e.msg.sender);
     require balanceOf(a) > 0;
+
+    mintAsAdmin@withrevert(e, a);
+    assert lastReverted;
+}
+
+rule mintAsAdmin_revertsWhen_zeroAddress () {
+    env e;
+    address a = 0;
+    require getAdmin(e.msg.sender);
+    require !getBlacklisted(a);
+    require balanceOf(a) == 0;
 
     mintAsAdmin@withrevert(e, a);
     assert lastReverted;

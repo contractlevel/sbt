@@ -529,8 +529,6 @@ contract Handler is Test {
 
         for (uint256 i = 0; i < logs.length; i++) {
             if (logs[i].topics[0] == signatureVerifiedEvent) {
-                // eventCount++;
-                // @review - come back to this
                 bytes memory emittedSignature = abi.decode(logs[i].data, (bytes));
                 g_emittedSignature[account] = emittedSignature;
 

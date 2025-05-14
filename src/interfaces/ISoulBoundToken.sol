@@ -22,7 +22,7 @@ interface ISoulBoundToken is IERC721Enumerable {
     function mintWithTerms(bytes memory signature) external payable returns (uint256 tokenId);
 
     /// @dev owner functions
-    function setContractURI(string memory contractURI) external;
+    function setContractURI(string memory newContractURI) external;
     function withdrawFees(uint256 amountToWithdraw) external;
     function setAdmin(address account, bool isAdmin) external;
     function batchSetAdmin(address[] calldata accounts, bool isAdmin) external;
