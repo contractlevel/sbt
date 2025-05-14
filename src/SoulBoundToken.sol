@@ -107,14 +107,16 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @param initialContractURI The contract URI for the token
     /// @param whitelistEnabled Whether the whitelist is enabled
     /// @param nativeUsdFeed The address of the native/USD Chainlink price feed
+    /// @param owner The owner of the contract
     /// @dev Initializes the token ID counter to 1
     constructor(
         string memory name,
         string memory symbol,
         string memory initialContractURI,
         bool whitelistEnabled,
-        address nativeUsdFeed
-    ) ERC721(name, symbol) Ownable(msg.sender) {
+        address nativeUsdFeed,
+        address owner
+    ) ERC721(name, symbol) Ownable(owner) {
         _setContractURI(initialContractURI);
         _setWhitelistEnabled(whitelistEnabled);
         s_tokenIdCounter = 1;
@@ -169,7 +171,9 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
         _revertIfNotWhitelisted(msg.sender);
         _revertIfAlreadyMinted(msg.sender);
         tokenId = _mintSoulBoundToken(msg.sender);
-        // @review - is this condition for emitting the event optimal? we could have if (fee != 0)
+        /// @notice the condition for emitting this event may not be optimal in terms of readability
+        /// or entirely accurate if someone pays a higher fee than is required
+        /// but other than that it is functionally correct and efficient in terms of gas
         if (msg.value > 0) emit FeeCollected(msg.sender, msg.value, tokenId);
     }
 
@@ -178,15 +182,12 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// The contract URI is intended to be an IPFS reference containing Terms of Service for token holders.
     /// @param signature Signed by msg.sender with Terms of Service hash
     /// @dev Revert if insufficient fee (ie msg.value is less than getFee())
-    /// @dev Revert if whitelist is enabled
     /// @dev Revert if signature is invalid
     /// @dev Revert if msg.sender already holds a token
     /// @notice The msg.value can be higher than the fee, excess value will be kept by the contract
     function mintWithTerms(bytes memory signature) external payable returns (uint256 tokenId) {
         _revertIfInsufficientFee();
         _revertIfBlacklisted(msg.sender);
-        // @review - this could be removed, allowing any user to mint with terms despite whitelist enabled/disabled
-        if (_isWhitelistEnabled()) revert SoulBoundToken__WhitelistEnabled();
         _revertIfAlreadyMinted(msg.sender);
 
         if (!_verifySignature(signature)) revert SoulBoundToken__InvalidSignature();
@@ -194,7 +195,6 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
 
         tokenId = _mintSoulBoundToken(msg.sender);
 
-        // @review - is this condition for emitting the event optimal? we could have if (fee != 0)
         if (msg.value > 0) emit FeeCollected(msg.sender, msg.value, tokenId);
     }
 

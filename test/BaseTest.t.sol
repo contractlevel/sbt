@@ -21,7 +21,7 @@ contract BaseTest is Test {
     bool internal whitelistEnabled;
     address internal nativeUsdFeed;
 
-    address internal owner = makeAddr("owner");
+    address internal owner;
     address internal admin = makeAddr("admin");
     address internal notOwner = makeAddr("notOwner");
     address internal notAdmin = makeAddr("notAdmin");
@@ -72,12 +72,7 @@ contract BaseTest is Test {
         (sbt, config) = deploy.run();
 
         /// @dev fetch args passed in constructor by deploy script
-        (name, symbol, contractURI, whitelistEnabled, nativeUsdFeed) = config.activeNetworkConfig();
-
-        /// @dev store owner
-        _changePrank(sbt.owner());
-        sbt.transferOwnership(owner);
-        _stopPrank();
+        (name, symbol, contractURI, whitelistEnabled, nativeUsdFeed, owner) = config.activeNetworkConfig();
     }
 
     /*//////////////////////////////////////////////////////////////

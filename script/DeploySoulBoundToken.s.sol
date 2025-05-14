@@ -16,11 +16,12 @@ contract DeploySoulBoundToken is Script {
             string memory symbol,
             string memory contractURI,
             bool whitelistEnabled,
-            address nativeUsdFeed
+            address nativeUsdFeed,
+            address owner
         ) = config.activeNetworkConfig();
 
         vm.startBroadcast();
-        SoulBoundToken sbt = new SoulBoundToken(name, symbol, contractURI, whitelistEnabled, nativeUsdFeed);
+        SoulBoundToken sbt = new SoulBoundToken(name, symbol, contractURI, whitelistEnabled, nativeUsdFeed, owner);
         vm.stopBroadcast();
         return (sbt, config);
     }

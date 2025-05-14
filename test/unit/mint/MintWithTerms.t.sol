@@ -4,14 +4,6 @@ pragma solidity 0.8.24;
 import {BaseTest, Vm} from "../../BaseTest.t.sol";
 
 contract MintWithTermsTest is BaseTest {
-    function test_sbt_mintWithTerms_revertsWhen_whitelistEnabled() public {
-        bytes memory signature = _createSignature(user, userPk, sbt.getTermsHash());
-
-        _changePrank(user);
-        vm.expectRevert(abi.encodeWithSignature("SoulBoundToken__WhitelistEnabled()"));
-        sbt.mintWithTerms(signature);
-    }
-
     function test_sbt_mintWithTerms_revertsWhen_blacklisted() public {
         bytes memory signature = _createSignature(user, userPk, sbt.getTermsHash());
 

@@ -298,9 +298,19 @@ persistent ghost mathint g_termsHashedEventCount {
     init_state axiom g_termsHashedEventCount == 0;
 }
 
-/// @notice track s_termsHash
-persistent ghost bytes32 g_termsHash {
-    init_state axiom g_termsHash == bytes32(0);
+/// @notice track s_termsHash updates
+persistent ghost mathint g_termsHashUpdateCount {
+    init_state axiom g_termsHashUpdateCount == 0;
+}
+
+/// @notice track amount FeeFactorSet event is emitted
+persistent ghost mathint g_feeFactorSetEventCount {
+    init_state axiom g_feeFactorSetEventCount == 0;
+}
+
+/// @notice track amount s_feeFactor is modified
+persistent ghost mathint g_feeFactorStorageCount {
+    init_state axiom g_feeFactorStorageCount == 0;
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -363,7 +373,7 @@ hook Sstore currentContract.s_whitelistEnabled bool newStatus (bool oldStatus) {
 
 /// @notice update g_termsHash when s_termsHash is modified
 hook Sstore currentContract.s_termsHash bytes32 newTermsHash (bytes32 oldTermsHash) {
-    g_termsHash = newTermsHash;
+    g_termsHashUpdateCount = g_termsHashUpdateCount + 1;
 }
 
 /// @notice hook onto emitted events and increment relevant ghosts
@@ -398,6 +408,7 @@ hook LOG2(uint offset, uint length, bytes32 t0, bytes32 t1) {
 hook LOG1(uint offset, uint length, bytes32 t0) {
     if (t0 == FeesWithdrawnEvent()) g_feesWithdrawnEventCount = g_feesWithdrawnEventCount + 1;
     if (t0 == ContractURIUpdatedEvent()) g_contractURIUpdatedEventCount = g_contractURIUpdatedEventCount + 1;
+    if (t0 == FeeFactorSetEvent()) g_feeFactorSetEventCount = g_feeFactorSetEventCount + 1;
 }
 
 /// @notice hook onto emitted AdminStatusSet event and increment relevant ghost
@@ -406,6 +417,11 @@ hook LOG3(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2) {
         g_adminStatusSetEventCount = g_adminStatusSetEventCount + 1;
         g_adminEventParams[assert_address(t1)] = bytes32ToBool(t2);
     }
+}
+
+/// @notice update g_feeFactorStorageCount when s_feeFactor is modified
+hook Sstore currentContract.s_feeFactor uint256 newValue (uint256 oldValue) {
+    g_feeFactorStorageCount = g_feeFactorStorageCount + 1;
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -492,6 +508,14 @@ invariant termsHash_nonZero()
 /// @notice ContractURIUpdated event should be emitted same number of times as TermsHashed event
 invariant contractURIUpdated_eventConsistency()
     g_contractURIUpdatedEventCount == g_termsHashedEventCount;
+
+/// @notice s_termsHash should be updated same number of times as TermsHashed event
+invariant termsHash_updateConsistency()
+    g_termsHashUpdateCount == g_termsHashedEventCount;
+
+/// @notice FeeFactorSet event should be emitted same number of times as storage updates
+invariant feeFactor_eventConsistency()
+    g_feeFactorStorageCount == g_feeFactorSetEventCount;
 
 /// @notice all tokens should be unique
 invariant tokenIdUniqueness(address a, address b, uint256 i)
@@ -1031,21 +1055,9 @@ rule mintAsWhitelisted_success() {
 }
 
 // --- mintWithTerms --- //
-rule mintWithTerms_revertsWhen_whitelistEnabled() {
-    env e;
-    calldataarg args;
-    require !getBlacklisted(e.msg.sender);
-    require e.msg.value >= getFee();
-
-    require getWhitelistEnabled();
-    mintWithTerms@withrevert(e, args);
-    assert lastReverted;
-}
-
 rule mintWithTerms_revertsWhen_blacklisted() {
     env e;
     calldataarg args;
-    require !getWhitelistEnabled();
     require e.msg.value >= getFee();
     
     require getBlacklisted(e.msg.sender);
@@ -1056,7 +1068,6 @@ rule mintWithTerms_revertsWhen_blacklisted() {
 rule mintWithTerms_revertsWhen_insufficientFee() {
     env e;
     calldataarg args;
-    require !getWhitelistEnabled();
     require !getBlacklisted(e.msg.sender);
     require getFee() > 0;
     
@@ -1068,7 +1079,6 @@ rule mintWithTerms_revertsWhen_insufficientFee() {
 rule mintWithTerms_revertsWhen_invalidSignature() {
     env e;
     bytes s;
-    require !getWhitelistEnabled();
     require !getBlacklisted(e.msg.sender);
     require getFee() > 0;
     require e.msg.value >= getFee();

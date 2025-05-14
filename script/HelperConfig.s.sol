@@ -14,6 +14,7 @@ contract HelperConfig is Script {
         string contractURI;
         bool whitelistEnabled;
         address nativeUsdFeed;
+        address owner;
     }
 
     NetworkConfig public activeNetworkConfig;
@@ -32,21 +33,23 @@ contract HelperConfig is Script {
     //////////////////////////////////////////////////////////////*/
     function getOptimismConfig() public pure returns (NetworkConfig memory) {
         return NetworkConfig({
-            name: "Evo Labs Membership Token", // review format
+            name: "Evo Labs DAO Membership",
             symbol: "EVO",
             contractURI: "ipfs://QmfKN2Cq3HSNXVr36MXHdRMvH2PDrby3y1cH1aRFbTkf4C/", // dummy value, replace in production
             whitelistEnabled: true,
-            nativeUsdFeed: 0xb7B9A39CC63f856b90B364911CC324dC46aC1770 // https://docs.chain.link/data-feeds/price-feeds/addresses?page=1&network=optimism&search=eth
+            nativeUsdFeed: 0xb7B9A39CC63f856b90B364911CC324dC46aC1770, // https://docs.chain.link/data-feeds/price-feeds/addresses?page=1&network=optimism&search=eth
+            owner: address(1) // dummy value, replace in production
         });
     }
 
     function getEthSepoliaConfig() public pure returns (NetworkConfig memory) {
         return NetworkConfig({
-            name: "Evo Labs Membership Token", // review format
+            name: "Evo Labs DAO Membership",
             symbol: "EVO",
             contractURI: "ipfs://QmfKN2Cq3HSNXVr36MXHdRMvH2PDrby3y1cH1aRFbTkf4C/", // dummy value, replace in production
             whitelistEnabled: true,
-            nativeUsdFeed: 0x694AA1769357215DE4FAC081bf1f309aDC325306 // https://docs.chain.link/data-feeds/price-feeds/addresses?page=1&network=optimism&search=eth
+            nativeUsdFeed: 0x694AA1769357215DE4FAC081bf1f309aDC325306, // https://docs.chain.link/data-feeds/price-feeds/addresses?page=1&network=optimism&search=eth
+            owner: address(1) // dummy value, replace in production
         });
     }
 
@@ -56,11 +59,12 @@ contract HelperConfig is Script {
         MockV3Aggregator mockPriceFeed = new MockV3Aggregator(decimals, initialAnswer);
 
         return NetworkConfig({
-            name: "Evo Labs SoulBoundToken", // review format
+            name: "Evo Labs DAO Membership",
             symbol: "EVO",
             contractURI: "ipfs://QmfKN2Cq3HSNXVr36MXHdRMvH2PDrby3y1cH1aRFbTkf4C/", // dummy value, replace in production
             whitelistEnabled: true,
-            nativeUsdFeed: address(mockPriceFeed)
+            nativeUsdFeed: address(mockPriceFeed),
+            owner: address(1) // dummy value, replace in production
         });
     }
 }

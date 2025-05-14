@@ -4,10 +4,15 @@ pragma solidity 0.8.24;
 import {SoulBoundToken, ECDSA, MessageHashUtils} from "../../src/SoulBoundToken.sol";
 
 contract Harness is SoulBoundToken {
-    constructor(string memory name, string memory symbol, string memory contractURI, bool whitelistEnabled, address nativeUsdFeed)
-        SoulBoundToken(name, symbol, contractURI, whitelistEnabled, nativeUsdFeed)
-    {}
-    
+    constructor(
+        string memory name,
+        string memory symbol,
+        string memory contractURI,
+        bool whitelistEnabled,
+        address nativeUsdFeed,
+        address owner
+    ) SoulBoundToken(name, symbol, contractURI, whitelistEnabled, nativeUsdFeed, owner) {}
+
     function bytes32ToBool(bytes32 value) public pure returns (bool) {
         return value != bytes32(0);
     }
