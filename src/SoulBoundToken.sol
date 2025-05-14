@@ -172,7 +172,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
         _revertIfAlreadyMinted(msg.sender);
         tokenId = _mintSoulBoundToken(msg.sender);
         /// @notice the condition for emitting this event may not be optimal in terms of readability
-        /// or entirely accurate if someone pays a higher fee than is required
+        /// if someone pays a higher fee than is required
         /// but other than that it is functionally correct and efficient in terms of gas
         if (msg.value > 0) emit FeeCollected(msg.sender, msg.value, tokenId);
     }
