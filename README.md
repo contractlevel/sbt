@@ -12,6 +12,7 @@ A SoulBoundToken contract for Optimism with administrative whitelist and blackli
     - [Admins](#admins)
     - [Whitelisted](#whitelisted)
     - [Blacklisted](#blacklisted)
+    - [Public Minters](#public-minters)
   - [Valid States](#valid-states)
     - [Whitelist Enabled](#whitelist-enabled)
     - [Whitelist Disabled](#whitelist-disabled)
@@ -43,13 +44,13 @@ A SoulBoundToken contract for Optimism with administrative whitelist and blackli
 - **Non-transferrable Tokens**: Tokens are "soulbound," meaning they cannot be transferred, traded, or approved for transfer.
 - **Single Token per Address**: Each address is limited to holding at most one token.
 - **Admin Roles**: Administrative roles enable controlled management of whitelists, blacklists, and contract settings.
-- **Whitelist Functionality**: Can be toggled on or off to restrict token minting to whitelisted addresses.
+- **Whitelist Functionality**: Can be toggled on or off to restrict whitelisted addresses minting themselves a token.
 - **Blacklist Functionality**: Blacklisted addresses have their tokens burned (if any) and are excluded from minting and whitelisting.
 - **Batch Operations**: Supports batch minting, whitelisting, blacklisting, and admin assignment for operational efficiency.
 
 ## Roles
 
-There are four key roles in this system:
+There are five key roles in this system:
 
 ### Owner
 
@@ -72,6 +73,10 @@ There are four key roles in this system:
 - If they previously held a token, it is burned upon blacklisting.
 - If they were on the whitelist, they are removed from it upon blacklisting.
 
+### Public Minters
+
+- Can mint a token with `mintWithTerms()` if they sign a message containing the terms hash.
+
 ## Valid States
 
 There are two valid states in this system:
@@ -79,11 +84,10 @@ There are two valid states in this system:
 ### Whitelist Enabled
 
 - Whitelisted accounts can mint a token for themselves.
-- Admins can mint tokens to whitelisted accounts.
 
 ### Whitelist Disabled
 
-- Admins can mint tokens to any address that is not blacklisted.
+- Whitelisted accounts _cannot_ mint a token for themselves.
 
 ## Constructor/Deployment
 
@@ -93,6 +97,9 @@ When the `SoulBoundToken` contract is deployed, the following parameters must be
 - `symbol`: The symbol of the token (e.g., "SBT").
 - `contractURI`: The contract URI for token metadata (e.g., "https://ipfs.io/ipfs/<CID>/").
 - `whitelistEnabled`: A boolean indicating whether the whitelist is initially enabled (`true`) or disabled (`false`).
+- `nativeUsdFeed`: The address of the native/USD Chainlink price feed.
+- `owner`: The address that becomes the owner of the contract.
+- `admins`: An array of addresses given the admin role.
 
 The deployer of the contract becomes the initial owner. **NOTE: This can be changed so the initial owner can be set to another address on deployment.**
 
@@ -122,12 +129,23 @@ Below are the external functions that modify the contract's state:
   - **Returns**: `uint256[]` - Array of minted token IDs.
 
 - **`mintAsWhitelisted()`**
+
   - **Description**: Allows a whitelisted address to mint a token for themselves.
   - **Requirements**:
     - Whitelist must be enabled.
     - Caller must be whitelisted.
     - Caller must not be blacklisted.
     - Caller must not already hold a token.
+    - Caller must provide `msg.value` >= `getFee()`.
+  - **Returns**: `uint256` - The ID of the minted token.
+
+- **`mintWithTerms()`**
+  - **Description**: Allows anyone to mint a token for themselves.
+  - **Requirements**:
+    - Caller must pass a signature containing a hash of the `contractURI()`, which can be obtained from `getTermsHash()` and their own address.
+    - Caller nit be blacklisted.
+    - Caller must not already hold a token.
+    - Caller must provide `msg.value` >= `getFee()`.
   - **Returns**: `uint256` - The ID of the minted token.
 
 ### Whitelist Management
@@ -237,7 +255,9 @@ Below are the external functions that modify the contract's state:
      - `symbol`: The token symbol (e.g., "SBT").
      - `contractURI`: The contract URI for token metadata (e.g., "https://ipfs.io/ipfs/<CID>/").
      - `whitelistEnabled`: Initial whitelist status (`true` or `false`).
-   - The deployer becomes the initial owner.
+     - `nativeUsdFeed`: The address of the native/USD Chainlink price feed.
+     - `owner`: The address that becomes the owner of the contract.
+     - `admins`: An array of addresses given the admin role.
 
 2. **Owner Setup**:
 
@@ -252,7 +272,11 @@ Below are the external functions that modify the contract's state:
    - Mint tokens using `mintAsAdmin` or `batchMintAsAdmin`.
 
 4. **Whitelisted Users**:
-   - If the whitelist is enabled, whitelisted users can call `mintAsWhitelisted` to mint a token for themselves (assuming they are not blacklisted and do not already hold a token).
+
+   - If the whitelist is enabled, whitelisted users can call `mintAsWhitelisted` to mint a token for themselves.
+
+5. **Other Users**:
+   - Anyone can call `mintWithTerms(bytes)` to mint a token. They must a signature with the hash of the `contractURI()`, which can be obtained from `getTermsHash()`.
 
 ## Testing
 
@@ -306,10 +330,13 @@ certoraRun ./certora/conf/FeesAccountancy.conf
 
 ## Known Issues
 
-- lack of zero address checks on constructor args
-  - justification: saves a bit of gas and we won't be deploying with 0 address
-- lack of empty array check on admins array passed in constructor
-  - justification: saves a bit of gas and won't be deploying with empty array
+- **Centralization risk** of admins/owner
+- **Lack of zero address checks** on constructor args
+  - _Justification_: saves a bit of gas and we won't be deploying with 0 address
+- **Lack of empty array check** on admins array passed in constructor
+  - _Justification_: saves a bit of gas and won't be deploying with empty array
+- **Event emission for batch functions could possibly be optimised**, ie currently individual events are emitted per array item as opposed to a single event for an entire array
+  - _Justification_: individual state changes are required for each array item anyway, so individual events isn't a _huge_ deal in terms of gas. It also makes reading indexed event params simpler, and it is not expected that batch functions will be used with ridiculously big arrays.
 
 ## Frontend Notes
 

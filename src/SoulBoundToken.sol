@@ -16,11 +16,12 @@ import {ISoulBoundToken} from "./interfaces/ISoulBoundToken.sol";
 /// @title SoulBoundToken
 /// @author @contractlevel
 /// @notice Non-transferrable ERC721 token with administrative whitelist and blacklist functionality
-/// @notice System Actors: Owner, Admins, Whitelisted, Blacklisted
+/// @notice System Actors: Owner, Admins, Whitelisted, Blacklisted, Public Minters
 /// @dev Owner - sets admin role and contract URI
 /// @dev Admins - set whitelisted and blacklisted roles, and enables/disables whitelist
 /// @dev Whitelisted - can mint a token if whitelist is enabled
 /// @dev Blacklisted - if held token, then burnt, and if whitelisted, then removed, and cant be whitelisted or minted
+/// @dev Public Minters - can mint a token if they sign a message agreeing with Terms of Service
 /// @notice Non-whitelisted users can mint tokens if they sign a message agreeing with Terms of Service
 /// @notice Fees are enforced on all user mints, and set by admins
 contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
