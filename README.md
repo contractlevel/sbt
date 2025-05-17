@@ -101,8 +101,6 @@ When the `SoulBoundToken` contract is deployed, the following parameters must be
 - `owner`: The address that becomes the owner of the contract.
 - `admins`: An array of addresses given the admin role.
 
-The deployer of the contract becomes the initial owner. **NOTE: This can be changed so the initial owner can be set to another address on deployment.**
-
 ## External Functions
 
 Below are the external functions that modify the contract's state:
@@ -114,7 +112,6 @@ Below are the external functions that modify the contract's state:
   - **Description**: Allows an admin to mint a token to a specified address.
   - **Requirements**:
     - Caller must be an admin.
-    - If whitelist is enabled, `account` must be whitelisted.
     - `account` must not be blacklisted.
     - `account` must not already hold a token.
   - **Returns**: `uint256` - The ID of the minted token.
@@ -139,11 +136,11 @@ Below are the external functions that modify the contract's state:
     - Caller must provide `msg.value` >= `getFee()`.
   - **Returns**: `uint256` - The ID of the minted token.
 
-- **`mintWithTerms()`**
+- **`mintWithTerms(bytes memory signature)`**
   - **Description**: Allows anyone to mint a token for themselves.
   - **Requirements**:
-    - Caller must pass a signature containing a hash of the `contractURI()`, which can be obtained from `getTermsHash()` and their own address.
-    - Caller nit be blacklisted.
+    - Caller must pass a signature containing a hash of the `getTermsHash()` and their own address. It is recommended callers review the `contractURI`.
+    - Caller must not be blacklisted.
     - Caller must not already hold a token.
     - Caller must provide `msg.value` >= `getFee()`.
   - **Returns**: `uint256` - The ID of the minted token.
