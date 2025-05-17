@@ -20,7 +20,7 @@ import {ISoulBoundToken} from "./interfaces/ISoulBoundToken.sol";
 /// @dev Owner - sets admin role and contract URI
 /// @dev Admins - set whitelisted and blacklisted roles, and enables/disables whitelist
 /// @dev Whitelisted - can mint a token if whitelist is enabled
-/// @dev Blacklisted - if held token, then burnt, and if whitelisted, then removed, and cant be whitelisted or minted
+/// @dev Blacklisted - if held token, then burnt, and if whitelisted, then removed, and cant be whitelisted or minted/mint themselves
 /// @dev Public Minters - can mint a token if they sign a message agreeing with Terms of Service
 /// @notice Non-whitelisted users can mint tokens if they sign a message agreeing with Terms of Service
 /// @notice Fees are enforced on all user mints, and set by admins
