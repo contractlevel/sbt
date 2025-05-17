@@ -15,6 +15,7 @@ contract HelperConfig is Script {
         bool whitelistEnabled;
         address nativeUsdFeed;
         address owner;
+        address[] admins;
     }
 
     NetworkConfig public activeNetworkConfig;
@@ -31,6 +32,10 @@ contract HelperConfig is Script {
     /*//////////////////////////////////////////////////////////////
                                  GETTER
     //////////////////////////////////////////////////////////////*/
+    function getActiveNetworkConfig() public view returns (NetworkConfig memory) {
+        return activeNetworkConfig;
+    }
+
     function getOptimismConfig() public pure returns (NetworkConfig memory) {
         return NetworkConfig({
             name: "Evo Labs DAO Membership",
@@ -38,7 +43,8 @@ contract HelperConfig is Script {
             contractURI: "ipfs://QmfKN2Cq3HSNXVr36MXHdRMvH2PDrby3y1cH1aRFbTkf4C/", // dummy value, replace in production
             whitelistEnabled: true,
             nativeUsdFeed: 0xb7B9A39CC63f856b90B364911CC324dC46aC1770, // https://docs.chain.link/data-feeds/price-feeds/addresses?page=1&network=optimism&search=eth
-            owner: address(1) // dummy value, replace in production
+            owner: address(1), // dummy value, replace in production
+            admins: _createAdminsArray() // dummy value, replace in production
         });
     }
 
@@ -49,7 +55,8 @@ contract HelperConfig is Script {
             contractURI: "ipfs://QmfKN2Cq3HSNXVr36MXHdRMvH2PDrby3y1cH1aRFbTkf4C/", // dummy value, replace in production
             whitelistEnabled: true,
             nativeUsdFeed: 0x694AA1769357215DE4FAC081bf1f309aDC325306,
-            owner: address(1) // dummy value, replace in production
+            owner: address(1), // dummy value, replace in production
+            admins: _createAdminsArray() // dummy value, replace in production
         });
     }
 
@@ -64,7 +71,17 @@ contract HelperConfig is Script {
             contractURI: "ipfs://QmfKN2Cq3HSNXVr36MXHdRMvH2PDrby3y1cH1aRFbTkf4C/", // dummy value, replace in production
             whitelistEnabled: true,
             nativeUsdFeed: address(mockPriceFeed),
-            owner: address(1) // dummy value, replace in production
+            owner: address(1), // dummy value, replace in production
+            admins: _createAdminsArray() // dummy value, replace in production
         });
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                              INTERNAL
+    //////////////////////////////////////////////////////////////*/
+    function _createAdminsArray() internal pure returns (address[] memory) {
+        address[] memory admins = new address[](1);
+        admins[0] = address(2); // dummy value, replace in production
+        return admins;
     }
 }

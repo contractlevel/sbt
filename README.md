@@ -27,6 +27,7 @@ A SoulBoundToken contract for Optimism with administrative whitelist and blackli
   - [Formal Verification](#formal-verification)
   - [Important Notes](#important-notes)
   - [Comments on Design Choices](#comments-on-design-choices)
+  - [Known Issues](#known-issues)
   - [Frontend Notes](#frontend-notes)
     - [Libraries for connecting frontend to smart contract:](#libraries-for-connecting-frontend-to-smart-contract)
     - [What is needed?](#what-is-needed)
@@ -302,6 +303,13 @@ certoraRun ./certora/conf/FeesAccountancy.conf
 - **Separate Add/Remove Functions**: Functions like `addToWhitelist` and `removeFromWhitelist` are separate rather than combined into a single `setWhitelist(address, bool)` function. This design choice prioritizes simplicity and readability over a more compact but less intuitive interface. The same applies to blacklist and batch equivalents.
 - **Token ID Management**: The `_incrementTokenIdCounter` function optimizes storage reads and writes during batch minting.
 - OpenZeppelin's Access control could replace the role management, but wouldn't make any difference in functionality or optimization
+
+## Known Issues
+
+- lack of zero address checks on constructor args
+  - justification: saves a bit of gas and we won't be deploying with 0 address
+- lack of empty array check on admins array passed in constructor
+  - justification: saves a bit of gas and won't be deploying with empty array
 
 ## Frontend Notes
 

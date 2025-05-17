@@ -11,17 +11,18 @@ contract DeploySoulBoundToken is Script {
     //////////////////////////////////////////////////////////////*/
     function run() public returns (SoulBoundToken, HelperConfig) {
         HelperConfig config = new HelperConfig();
-        (
-            string memory name,
-            string memory symbol,
-            string memory contractURI,
-            bool whitelistEnabled,
-            address nativeUsdFeed,
-            address owner
-        ) = config.activeNetworkConfig();
+        HelperConfig.NetworkConfig memory networkConfig = config.getActiveNetworkConfig();
 
         vm.startBroadcast();
-        SoulBoundToken sbt = new SoulBoundToken(name, symbol, contractURI, whitelistEnabled, nativeUsdFeed, owner);
+        SoulBoundToken sbt = new SoulBoundToken(
+            networkConfig.name,
+            networkConfig.symbol,
+            networkConfig.contractURI,
+            networkConfig.whitelistEnabled,
+            networkConfig.nativeUsdFeed,
+            networkConfig.owner,
+            networkConfig.admins
+        );
         vm.stopBroadcast();
         return (sbt, config);
     }

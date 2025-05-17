@@ -10,8 +10,9 @@ contract Harness is SoulBoundToken {
         string memory contractURI,
         bool whitelistEnabled,
         address nativeUsdFeed,
-        address owner
-    ) SoulBoundToken(name, symbol, contractURI, whitelistEnabled, nativeUsdFeed, owner) {}
+        address owner,
+        address[] memory admins
+    ) SoulBoundToken(name, symbol, contractURI, whitelistEnabled, nativeUsdFeed, owner, admins) {}
 
     function bytes32ToBool(bytes32 value) public pure returns (bool) {
         return value != bytes32(0);

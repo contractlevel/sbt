@@ -34,6 +34,7 @@ contract BaseTest is Test {
     address internal user2;
     uint256 internal user2Pk;
     address[] internal accounts;
+    address[] internal initialAdmins;
 
     /*//////////////////////////////////////////////////////////////
                                  SET UP
@@ -72,7 +73,14 @@ contract BaseTest is Test {
         (sbt, config) = deploy.run();
 
         /// @dev fetch args passed in constructor by deploy script
-        (name, symbol, contractURI, whitelistEnabled, nativeUsdFeed, owner) = config.activeNetworkConfig();
+        HelperConfig.NetworkConfig memory networkConfig = config.getActiveNetworkConfig();
+        name = networkConfig.name;
+        symbol = networkConfig.symbol;
+        contractURI = networkConfig.contractURI;
+        whitelistEnabled = networkConfig.whitelistEnabled;
+        nativeUsdFeed = networkConfig.nativeUsdFeed;
+        owner = networkConfig.owner;
+        initialAdmins = networkConfig.admins;
     }
 
     /*//////////////////////////////////////////////////////////////

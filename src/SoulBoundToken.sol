@@ -108,15 +108,22 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @param whitelistEnabled Whether the whitelist is enabled
     /// @param nativeUsdFeed The address of the native/USD Chainlink price feed
     /// @param owner The owner of the contract
+    /// @param admins The initial admins of the contract
+    /// @dev Sets the admin status for the initial admins
     /// @dev Initializes the token ID counter to 1
+    /// @dev Hashes the contract URI and stores in s_termsHash
     constructor(
         string memory name,
         string memory symbol,
         string memory initialContractURI,
         bool whitelistEnabled,
         address nativeUsdFeed,
-        address owner
+        address owner,
+        address[] memory admins
     ) ERC721(name, symbol) Ownable(owner) {
+        for (uint256 i = 0; i < admins.length; ++i) {
+            _setAdmin(admins[i], true);
+        }
         _setContractURI(initialContractURI);
         _setWhitelistEnabled(whitelistEnabled);
         s_tokenIdCounter = 1;
@@ -289,6 +296,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @dev Revert if the admin status is already set
     /// @notice Only the owner can set the admin status
     function setAdmin(address account, bool isAdmin) external onlyOwner {
+        _setAdminChecks(account, isAdmin);
         _setAdmin(account, isAdmin);
     }
 
@@ -301,6 +309,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     function batchSetAdmin(address[] calldata accounts, bool isAdmin) external onlyOwner {
         _revertIfEmptyArray(accounts);
         for (uint256 i = 0; i < accounts.length; ++i) {
+            _setAdminChecks(accounts[i], isAdmin);
             _setAdmin(accounts[i], isAdmin);
         }
     }
@@ -468,10 +477,18 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @param account The address to set the admin status for
     /// @param isAdmin The admin status to set
     function _setAdmin(address account, bool isAdmin) internal {
-        _revertIfZeroAddress(account);
-        if (s_admins[account] == isAdmin) revert SoulBoundToken__AdminStatusAlreadySet(account, isAdmin);
         s_admins[account] = isAdmin;
         emit AdminStatusSet(account, isAdmin);
+    }
+
+    /// @dev Revert if account is zero address
+    /// @dev Revert if admin status is already set
+    /// @notice Only the owner can set the admin status
+    /// @param account The address to set the admin status for
+    /// @param isAdmin The admin status to set
+    function _setAdminChecks(address account, bool isAdmin) internal view {
+        _revertIfZeroAddress(account);
+        if (s_admins[account] == isAdmin) revert SoulBoundToken__AdminStatusAlreadySet(account, isAdmin);
     }
 
     /// @notice This function verifies whether a signature is valid or not
