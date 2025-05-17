@@ -317,7 +317,7 @@ certoraRun ./certora/conf/FeesAccountancy.conf
 - **Token Limits**: Each address can hold at most one token. Attempts to mint to an address that already holds a token will revert with `SoulBoundToken__AlreadyMinted`.
 - **Token IDs**: Token IDs start at 1 and increment sequentially with each mint.
 - **Error Handling**: Functions include detailed revert conditions (e.g., zero address checks, duplicate status checks) to ensure robust and secure operation.
-- **Zero Address Mints**: ERC721 reverts if mints are attempted to the zero address, so that functionality hasn't been explictly added.
+- **Zero Address Mints**: ERC721 reverts if mints are attempted to the zero address, so that functionality hasn't been explicitly added.
 
 ## Comments on Design Choices
 
