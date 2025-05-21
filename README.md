@@ -61,7 +61,7 @@ There are five key roles in this system:
 
 - Can assign and revoke whitelisted and blacklisted roles.
 - Can enable or disable the whitelist.
-- Can mint tokens to addresses (subject to whitelist and blacklist rules).
+- Can mint tokens to addresses (subject to blacklist rules).
 
 ### Whitelisted
 
