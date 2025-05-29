@@ -9,6 +9,10 @@ contract MintWithTermsTest is BaseTest {
 
         _changePrank(admin);
         sbt.pause();
+
+        _changePrank(user);
+        vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
+        sbt.mintWithTerms(signature);
     }
 
     function test_sbt_mintWithTerms_revertsWhen_blacklisted() public {
