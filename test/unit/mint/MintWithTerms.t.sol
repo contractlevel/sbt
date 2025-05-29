@@ -67,6 +67,10 @@ contract MintWithTermsTest is BaseTest {
         bytes32 termsHash = sbt.getTermsHash();
         bytes memory signature = _createSignature(user, userPk, termsHash);
 
+        _changePrank(admin);
+        sbt.pause();
+        sbt.unpause();
+
         vm.recordLogs();
 
         _changePrank(user);

@@ -1055,24 +1055,40 @@ rule mintAsWhitelisted_success() {
 }
 
 // --- mintWithTerms --- //
+rule mintWithTerms_revertsWhen_paused() {
+    env e;
+    bytes s;
+    require e.msg.value >= getFee();
+    require !getBlacklisted(e.msg.sender);
+    require getVerifiedSignature(e, s);
+
+    require currentContract._paused;
+    mintWithTerms@withrevert(e, s);
+    assert lastReverted;
+}
+
 rule mintWithTerms_revertsWhen_blacklisted() {
     env e;
-    calldataarg args;
+    bytes s;
     require e.msg.value >= getFee();
+    require !currentContract._paused;
+    require getVerifiedSignature(e, s);
     
     require getBlacklisted(e.msg.sender);
-    mintWithTerms@withrevert(e, args);
+    mintWithTerms@withrevert(e, s);
     assert lastReverted;
 }
 
 rule mintWithTerms_revertsWhen_insufficientFee() {
     env e;
-    calldataarg args;
+    bytes s;
     require !getBlacklisted(e.msg.sender);
     require getFee() > 0;
+    require !currentContract._paused;
+    require getVerifiedSignature(e, s);
     
     require e.msg.value < getFee();
-    mintWithTerms@withrevert(e, args);
+    mintWithTerms@withrevert(e, s);
     assert lastReverted;
 }
 
@@ -1082,6 +1098,7 @@ rule mintWithTerms_revertsWhen_invalidSignature() {
     require !getBlacklisted(e.msg.sender);
     require getFee() > 0;
     require e.msg.value >= getFee();
+    require !currentContract._paused;
 
     require !getVerifiedSignature(e, s);
     mintWithTerms@withrevert(e, s);
