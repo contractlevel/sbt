@@ -177,10 +177,6 @@ contract Handler is Test {
             if (sbt.getWhitelistEnabled()) _ifNotWhitelistedThenAdd(admin, account);
             if (sbt.balanceOf(account) > 0) return;
 
-            /// @dev update ghost variables before the call
-            _updateMintGhosts(account);
-            g_batchMintAsAdminCalls++;
-
             /// @dev add account to batch
             accountsToMint[i] = account;
         }
@@ -188,6 +184,12 @@ contract Handler is Test {
         /// @dev execute the batch mint as admin
         _changePrank(admin);
         sbt.batchMintAsAdmin(accountsToMint);
+
+        /// @dev update ghost variables after successful mint
+        for (uint256 i = 0; i < length; ++i) {
+            _updateMintGhosts(accountsToMint[i]);
+            g_batchMintAsAdminCalls++;
+        }
     }
 
     function setWhitelistEnabled(uint256 adminSeed) external {
