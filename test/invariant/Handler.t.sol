@@ -272,6 +272,9 @@ contract Handler is Test {
 
             /// @dev add account to batch
             accountsToRemove[i] = account;
+
+            g_whitelisted[accountsToRemove[i]] = false;
+            whitelisted.remove(accountsToRemove[i]);
         }
 
         /// @dev execute the batch remove from whitelist

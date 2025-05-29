@@ -8,7 +8,7 @@ remappings = [
 ]
 
 [invariant]
-runs = 256
+runs = 1000
 depth = 15
 fail_on_revert = true
 
