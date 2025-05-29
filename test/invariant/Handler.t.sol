@@ -73,6 +73,9 @@ contract Handler is Test {
     /// @dev track signature emitted in SignatureVerified event
     mapping(address signer => bytes signature) public g_emittedSignature;
 
+    /// @dev track the paused state
+    bool public g_paused;
+
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
@@ -93,6 +96,8 @@ contract Handler is Test {
         if (sbt.balanceOf(account) > 0) return;
         _ifBlacklistedThenRemove(admin, account);
         if (sbt.getWhitelistEnabled()) _setWhitelistEnabled(admin, false);
+
+        if (g_paused) _setPause(admin, false);
 
         /// @dev update mint ghosts
         _updateMintGhosts(account);
@@ -440,6 +445,20 @@ contract Handler is Test {
         MockV3Aggregator(sbt.getNativeUsdFeed()).updateAnswer(updatedAnswer);
     }
 
+    function pause(uint256 adminSeed) external {
+        /// @dev get admin
+        address admin = _createOrGetAdmin(adminSeed);
+        if (g_paused) _setPause(admin, false);
+        else _setPause(admin, true);
+    }
+
+    function unpause(uint256 adminSeed) external {
+        /// @dev get admin
+        address admin = _createOrGetAdmin(adminSeed);
+        if (g_paused) _setPause(admin, false);
+        else _setPause(admin, true);
+    }
+
     /*//////////////////////////////////////////////////////////////
                                 INTERNAL
     //////////////////////////////////////////////////////////////*/
@@ -526,6 +545,13 @@ contract Handler is Test {
         _updateAdminGhosts(admin, isAdmin);
         _changePrank(owner);
         sbt.setAdmin(admin, isAdmin);
+    }
+
+    function _setPause(address admin, bool isPaused) internal {
+        _changePrank(admin);
+        if (isPaused) sbt.pause();
+        else sbt.unpause();
+        g_paused = isPaused;
     }
 
     function _handleLogs(address account) internal {

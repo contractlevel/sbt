@@ -21,7 +21,7 @@ contract Invariant is StdInvariant, BaseTest {
         handler = new Handler(sbt, owner);
 
         /// @dev define appropriate function selectors
-        bytes4[] memory selectors = new bytes4[](19);
+        bytes4[] memory selectors = new bytes4[](21);
         /// @dev mint functions
         selectors[0] = Handler.mintAsAdmin.selector;
         selectors[1] = Handler.mintAsWhitelisted.selector;
@@ -45,8 +45,10 @@ contract Invariant is StdInvariant, BaseTest {
         selectors[16] = Handler.withdrawFees.selector;
         /// @dev other admin functions
         selectors[17] = Handler.setFeeFactor.selector;
+        selectors[18] = Handler.pause.selector;
+        selectors[19] = Handler.unpause.selector;
         /// @dev utility
-        selectors[18] = Handler.changeNativeUsdPrice.selector;
+        selectors[20] = Handler.changeNativeUsdPrice.selector;
 
         /// @dev target handler and appropriate function selectors
         targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
