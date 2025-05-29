@@ -61,7 +61,9 @@ definition onlyAdmin(method f) returns bool =
     f.selector == sig:batchRemoveFromBlacklist(address[]).selector ||
     f.selector == sig:mintAsAdmin(address).selector ||
     f.selector == sig:batchMintAsAdmin(address[]).selector ||
-    f.selector == sig:setFeeFactor(uint256).selector;
+    f.selector == sig:setFeeFactor(uint256).selector ||
+    f.selector == sig:pause().selector ||
+    f.selector == sig:unpause().selector;
 
 /// @notice functions that can only be called by the owner
 definition onlyOwner(method f) returns bool = 
