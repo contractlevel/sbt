@@ -62,6 +62,7 @@ There are five key roles in this system:
 - Can assign and revoke whitelisted and blacklisted roles.
 - Can enable or disable the whitelist.
 - Can mint tokens to addresses (subject to blacklist rules).
+- Can pause and unpause `mintWithTerms(bytes)`.
 
 ### Whitelisted
 
@@ -143,6 +144,7 @@ Below are the external functions that modify the contract's state:
     - Caller must not be blacklisted.
     - Caller must not already hold a token.
     - Caller must provide `msg.value` >= `getFee()`.
+    - Contract must not be paused.
   - **Returns**: `uint256` - The ID of the minted token.
 
 ### Whitelist Management
@@ -273,7 +275,7 @@ Below are the external functions that modify the contract's state:
    - If the whitelist is enabled, whitelisted users can call `mintAsWhitelisted` to mint a token for themselves.
 
 5. **Other Users**:
-   - Anyone can call `mintWithTerms(bytes)` to mint a token. They must a signature with the hash of the `contractURI()`, which can be obtained from `getTermsHash()`.
+   - Anyone can call `mintWithTerms(bytes)` to mint a token when the contract is not paused. They must provide a signature with the hash of the `contractURI()`, which can be obtained from `getTermsHash()` and their own address.
 
 ## Testing
 

@@ -4,6 +4,13 @@ pragma solidity 0.8.24;
 import {BaseTest, Vm} from "../../BaseTest.t.sol";
 
 contract MintWithTermsTest is BaseTest {
+    function test_sbt_mintWithTerms_revertsWhen_paused() public {
+        bytes memory signature = _createSignature(user, userPk, sbt.getTermsHash());
+
+        _changePrank(admin);
+        sbt.pause();
+    }
+
     function test_sbt_mintWithTerms_revertsWhen_blacklisted() public {
         bytes memory signature = _createSignature(user, userPk, sbt.getTermsHash());
 

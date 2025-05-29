@@ -10,6 +10,7 @@ import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {ISoulBoundToken} from "./interfaces/ISoulBoundToken.sol";
 
@@ -24,7 +25,7 @@ import {ISoulBoundToken} from "./interfaces/ISoulBoundToken.sol";
 /// @dev Public Minters - can mint a token if they sign a message agreeing with Terms of Service
 /// @notice Non-whitelisted users can mint tokens if they sign a message agreeing with Terms of Service
 /// @notice Fees are enforced on all user mints, and set by admins
-contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
+contract SoulBoundToken is ERC721Enumerable, Ownable, Pausable, ISoulBoundToken {
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
@@ -192,8 +193,9 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     /// @dev Revert if insufficient fee (ie msg.value is less than getFee())
     /// @dev Revert if signature is invalid
     /// @dev Revert if msg.sender already holds a token
+    /// @dev Revert if contract is paused
     /// @notice The msg.value can be higher than the fee, excess value will be kept by the contract
-    function mintWithTerms(bytes memory signature) external payable returns (uint256 tokenId) {
+    function mintWithTerms(bytes memory signature) external payable whenNotPaused returns (uint256 tokenId) {
         _revertIfInsufficientFee();
         _revertIfBlacklisted(msg.sender);
         _revertIfAlreadyMinted(msg.sender);
@@ -559,6 +561,22 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, ISoulBoundToken {
     function setFeeFactor(uint256 newFeeFactor) external onlyAdmin {
         s_feeFactor = newFeeFactor;
         emit FeeFactorSet(newFeeFactor);
+    }
+
+    /// @dev Pauses the contract
+    /// @notice This is an admin only function
+    /// @dev Revert if contract is paused
+    /// @notice Pause functionality in this contract is used to disable public minting
+    function pause() external onlyAdmin {
+        _pause();
+    }
+
+    /// @dev Unpauses the contract
+    /// @notice This is an admin only function
+    /// @dev Revert if contract is not paused
+    /// @notice Unpause functionality in this contract is used to enable public minting
+    function unpause() external onlyAdmin {
+        _unpause();
     }
 
     /*//////////////////////////////////////////////////////////////
