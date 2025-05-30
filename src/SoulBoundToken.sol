@@ -12,8 +12,11 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
-import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+import {IAggregatorV3} from "./interfaces/IAggregatorV3.sol";
+import {IAggregator} from "./interfaces/IAggregator.sol";
 import {ISoulBoundToken} from "./interfaces/ISoulBoundToken.sol";
+
+import {console2} from "forge-std/Test.sol";
 
 /// @title SoulBoundToken
 /// @author @contractlevel
@@ -48,15 +51,25 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, Pausable, ISoulBoundToken 
     error SoulBoundToken__WithdrawFailed();
     error SoulBoundToken__NoZeroValue();
     error SoulBoundToken__InsufficientBalance();
+    error SoulBoundToken__StalePriceFeed();
+    error SoulBoundToken__SequencerDown();
+    error SoulBoundToken__GracePeriodNotOver();
+    error SoulBoundToken__InvalidPrice();
 
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
     //////////////////////////////////////////////////////////////*/
     /// @dev Chainlink price feeds return answers with 8 decimals so we need this to calculate fee
     uint256 internal constant PRICE_FEED_PRECISION = 10 ** 8;
+    /// @dev Grace period for sequencer uptime feed
+    uint256 internal constant GRACE_PERIOD_TIME = 120 seconds;
 
     /// @dev Chainlink price feed for native/USD
-    AggregatorV3Interface internal immutable i_nativeUsdFeed;
+    IAggregatorV3 internal immutable i_nativeUsdFeed;
+    /// @dev Price feed staleness threshold
+    uint256 internal immutable i_priceFeedStalenessThreshold;
+    /// @dev Chainlink price feed for sequencer uptime
+    IAggregatorV3 internal immutable i_sequencerUptimeFeed;
 
     /// @dev Hash of contract URI (which is intended to be IPFS resource for Terms of Service)
     bytes32 internal s_termsHash;
@@ -111,6 +124,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, Pausable, ISoulBoundToken 
     /// @param nativeUsdFeed The address of the native/USD Chainlink price feed
     /// @param owner The owner of the contract
     /// @param admins The initial admins of the contract
+    /// @param priceFeedStalenessThreshold The staleness threshold for the price feed
     /// @dev Sets the admin status for the initial admins
     /// @dev Initializes the token ID counter to 1
     /// @dev Hashes the contract URI and stores in s_termsHash
@@ -121,7 +135,9 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, Pausable, ISoulBoundToken 
         bool whitelistEnabled,
         address nativeUsdFeed,
         address owner,
-        address[] memory admins
+        address[] memory admins,
+        uint256 priceFeedStalenessThreshold,
+        address sequencerUptimeFeed
     ) ERC721(name, symbol) Ownable(owner) {
         for (uint256 i = 0; i < admins.length; ++i) {
             _setAdmin(admins[i], true);
@@ -129,7 +145,9 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, Pausable, ISoulBoundToken 
         _setContractURI(initialContractURI);
         _setWhitelistEnabled(whitelistEnabled);
         s_tokenIdCounter = 1;
-        i_nativeUsdFeed = AggregatorV3Interface(nativeUsdFeed);
+        i_nativeUsdFeed = IAggregatorV3(nativeUsdFeed);
+        i_priceFeedStalenessThreshold = priceFeedStalenessThreshold;
+        i_sequencerUptimeFeed = IAggregatorV3(sequencerUptimeFeed);
         _hashTerms(initialContractURI);
     }
 
@@ -528,10 +546,35 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, Pausable, ISoulBoundToken 
     }
 
     /// @dev returns the latest native/USD price
+    /// @dev Revert if sequencer is down
+    /// @dev Revert if grace period is not over
+    /// @dev Revert if price is out of bounds
+    /// @dev Revert if price feed is stale
     function _getLatestPrice() internal view returns (uint256) {
         //slither-disable-next-line unused-return
-        (, int256 price,,,) = i_nativeUsdFeed.latestRoundData();
+        (, int256 answer, uint256 startedAt,,) = i_sequencerUptimeFeed.latestRoundData();
+        if (answer == 1) revert SoulBoundToken__SequencerDown();
+        //slither-disable-next-line timestamp
+        if (_getGracePeriodActive(startedAt)) revert SoulBoundToken__GracePeriodNotOver();
+
+        //slither-disable-next-line unused-return
+        (, int256 price,, uint256 updatedAt,) = i_nativeUsdFeed.latestRoundData();
+
+        IAggregator aggregator = IAggregator(i_nativeUsdFeed.aggregator());
+        if (price < aggregator.minAnswer() || price > aggregator.maxAnswer()) revert SoulBoundToken__InvalidPrice();
+
+        //slither-disable-next-line timestamp
+        if (updatedAt < block.timestamp - i_priceFeedStalenessThreshold) revert SoulBoundToken__StalePriceFeed();
+
         return uint256(price);
+    }
+
+    /// @dev Checks if the grace period is active
+    /// @param startedAt The timestamp of the last round
+    /// @return bool Whether the grace period is active
+    function _getGracePeriodActive(uint256 startedAt) internal view returns (bool) {
+        //slither-disable-next-line timestamp
+        return block.timestamp - startedAt <= GRACE_PERIOD_TIME;
     }
 
     /// @dev gets the fee for minting
@@ -640,6 +683,15 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, Pausable, ISoulBoundToken 
     /// @return feeFactor The value set by admins to calculate fee price
     function getFeeFactor() external view returns (uint256) {
         return s_feeFactor;
+    }
+
+    /// @dev Checks if the grace period for the sequencer uptime feed is active
+    /// @dev If this is returning true, then minting will revert if it requires a fee
+    /// @return bool Whether the grace period is active
+    function getGracePeriodActive() external view returns (bool) {
+        //slither-disable-next-line unused-return
+        (,, uint256 startedAt,,) = i_sequencerUptimeFeed.latestRoundData();
+        return _getGracePeriodActive(startedAt);
     }
 
     /*//////////////////////////////////////////////////////////////

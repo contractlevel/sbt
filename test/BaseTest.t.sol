@@ -10,7 +10,7 @@ contract BaseTest is Test {
                                VARIABLES
     //////////////////////////////////////////////////////////////*/
     string internal constant OPTIMISM_MAINNET_RPC_URL = "https://mainnet.optimism.io";
-    uint256 internal constant OPTIMISM_MAINNET_STARTING_BLOCK = 134098035;
+    uint256 internal constant OPTIMISM_MAINNET_STARTING_BLOCK = 136507334;
     uint256 internal optimismFork;
 
     SoulBoundToken internal sbt;

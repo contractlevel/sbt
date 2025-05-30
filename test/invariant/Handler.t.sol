@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 import {Test, Vm, console2, SoulBoundToken} from "../BaseTest.t.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
-import {MockV3Aggregator} from "../mocks/MockV3Aggregator.sol";
+import {MockAggregatorV3} from "../mocks/MockAggregatorV3.sol";
 
 contract Handler is Test {
     /*//////////////////////////////////////////////////////////////
@@ -82,6 +82,8 @@ contract Handler is Test {
     constructor(SoulBoundToken _sbt, address _owner) {
         sbt = _sbt;
         owner = _owner;
+        /// @notice warping 1 hour into the future to avoid grace period underflows
+        vm.warp(block.timestamp + 3600 seconds);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -102,6 +104,9 @@ contract Handler is Test {
         /// @dev update mint ghosts
         _updateMintGhosts(account);
         g_mintWithTermsCalls++;
+
+        /// @dev warp past grace period before getFee
+        _warpPastGracePeriodIfActive();
 
         /// @dev handle fees and update fee ghosts
         uint256 fee = sbt.getFee();
@@ -152,6 +157,9 @@ contract Handler is Test {
         /// @dev update mint ghosts
         _updateMintGhosts(account);
         g_mintAsWhitelistedCalls++;
+
+        /// @dev warp past grace period before getFee
+        _warpPastGracePeriodIfActive();
 
         /// @dev handle fees and update fee ghosts
         uint256 fee = sbt.getFee();
@@ -437,12 +445,12 @@ contract Handler is Test {
 
     function changeNativeUsdPrice(uint256 newPrice) external {
         /// @dev bounding the price between $100 and $10,000
-        uint256 minPrice = 100 * 10 ** 8; // 10,000,000,000
-        uint256 maxPrice = 10000 * 10 ** 8; // 1,000,000,000,000
+        uint256 minPrice = 100; // $100
+        uint256 maxPrice = 10000; // $10,000
         newPrice = bound(newPrice, minPrice, maxPrice);
 
-        int256 updatedAnswer = int256(newPrice);
-        MockV3Aggregator(sbt.getNativeUsdFeed()).updateAnswer(updatedAnswer);
+        int256 updatedAnswer = int256(newPrice * 10 ** 8); // Convert to 8 decimals
+        MockAggregatorV3(sbt.getNativeUsdFeed()).updateAnswer(updatedAnswer);
     }
 
     function pause(uint256 adminSeed) external {
@@ -567,6 +575,10 @@ contract Handler is Test {
                 assertEq(emittedSigner, account);
             }
         }
+    }
+
+    function _warpPastGracePeriodIfActive() internal {
+        if (sbt.getGracePeriodActive()) vm.warp(block.timestamp + 121 seconds);
     }
 
     /*//////////////////////////////////////////////////////////////

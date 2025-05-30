@@ -2,7 +2,8 @@
 pragma solidity 0.8.24;
 
 import {Script} from "forge-std/Script.sol";
-import {MockV3Aggregator} from "../test/mocks/MockV3Aggregator.sol";
+import {MockAggregatorV3} from "../test/mocks/MockAggregatorV3.sol";
+import {MockAggregator} from "../test/mocks/MockAggregator.sol";
 
 contract HelperConfig is Script {
     /*//////////////////////////////////////////////////////////////
@@ -16,6 +17,8 @@ contract HelperConfig is Script {
         address nativeUsdFeed;
         address owner;
         address[] admins;
+        uint256 priceFeedStalenessThreshold;
+        address sequencerUptimeFeed;
     }
 
     NetworkConfig public activeNetworkConfig;
@@ -25,7 +28,7 @@ contract HelperConfig is Script {
     //////////////////////////////////////////////////////////////*/
     constructor() {
         if (block.chainid == 10) activeNetworkConfig = getOptimismConfig();
-        if (block.chainid == 11155111) activeNetworkConfig = getEthSepoliaConfig();
+        else if (block.chainid == 11155111) activeNetworkConfig = getEthSepoliaConfig();
         else activeNetworkConfig = getOrCreateAnvilEthConfig();
     }
 
@@ -40,11 +43,13 @@ contract HelperConfig is Script {
         return NetworkConfig({
             name: "Evo Labs DAO Membership",
             symbol: "EVO",
-            contractURI: "ipfs://QmfKN2Cq3HSNXVr36MXHdRMvH2PDrby3y1cH1aRFbTkf4C/", // dummy value, replace in production
+            contractURI: "ipfs://QmfKN2Cq3HSNXVr36MXHdRMvH2PDrby3y1cH1aRFbTkf4C/", // @review dummy value, replace in production
             whitelistEnabled: true,
             nativeUsdFeed: 0xb7B9A39CC63f856b90B364911CC324dC46aC1770, // https://docs.chain.link/data-feeds/price-feeds/addresses?page=1&network=optimism&search=eth
-            owner: address(1), // dummy value, replace in production
-            admins: _createAdminsArray() // dummy value, replace in production
+            owner: address(1), // @review dummy value, replace in production
+            admins: _createAdminsArray(), // @review dummy value, replace in production
+            priceFeedStalenessThreshold: 1200 seconds, // https://docs.chain.link/data-feeds/price-feeds/addresses/?network=optimism&page=1&testnetPage=1&search=eth%2Fusd#data-feed-best-practices
+            sequencerUptimeFeed: 0x371EAD81c9102C9BF4874A9075FFFf170F2Ee389 // https://docs.chain.link/data-feeds/l2-sequencer-feeds#op
         });
     }
 
@@ -56,14 +61,21 @@ contract HelperConfig is Script {
             whitelistEnabled: true,
             nativeUsdFeed: 0x694AA1769357215DE4FAC081bf1f309aDC325306,
             owner: address(1), // dummy value, replace in production
-            admins: _createAdminsArray() // dummy value, replace in production
+            admins: _createAdminsArray(), // dummy value, replace in production
+            priceFeedStalenessThreshold: 3600 seconds, // https://docs.chain.link/data-feeds/price-feeds/addresses/?network=ethereum&page=1&testnetPage=1&testnetSearch=eth%2Fusd#sepolia-testnet
+            sequencerUptimeFeed: address(0) // @review
         });
     }
 
     function getOrCreateAnvilEthConfig() public returns (NetworkConfig memory) {
         uint8 decimals = 8;
+        // the answer returned by mockPriceFeed will be the price of ETH in USD
         int256 initialAnswer = 2000 * 1e8; // $2000/ETH
-        MockV3Aggregator mockPriceFeed = new MockV3Aggregator(decimals, initialAnswer);
+        MockAggregator mockAggregator = new MockAggregator();
+        MockAggregatorV3 mockPriceFeed = new MockAggregatorV3(decimals, initialAnswer, address(mockAggregator));
+        // the answer returned by mockSequencerFeed will be the uptime of the sequencer, ie 0 or 1
+        int256 initialUptimeAnswer = 0;
+        MockAggregatorV3 mockSequencerFeed = new MockAggregatorV3(decimals, initialUptimeAnswer, address(0));
 
         return NetworkConfig({
             name: "Evo Labs DAO Membership",
@@ -72,7 +84,9 @@ contract HelperConfig is Script {
             whitelistEnabled: true,
             nativeUsdFeed: address(mockPriceFeed),
             owner: address(1), // dummy value, replace in production
-            admins: _createAdminsArray() // dummy value, replace in production
+            admins: _createAdminsArray(), // dummy value, replace in production
+            priceFeedStalenessThreshold: 3600 seconds, // @review
+            sequencerUptimeFeed: address(mockSequencerFeed)
         });
     }
 

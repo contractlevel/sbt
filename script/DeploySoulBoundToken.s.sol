@@ -21,7 +21,9 @@ contract DeploySoulBoundToken is Script {
             networkConfig.whitelistEnabled,
             networkConfig.nativeUsdFeed,
             networkConfig.owner,
-            networkConfig.admins
+            networkConfig.admins,
+            networkConfig.priceFeedStalenessThreshold,
+            networkConfig.sequencerUptimeFeed
         );
         vm.stopBroadcast();
         return (sbt, config);
