@@ -7,7 +7,7 @@ import {
     ERC721
 } from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
@@ -30,7 +30,7 @@ import {console2} from "forge-std/Test.sol";
 /// @dev Public Minters - can mint a token if they sign a message agreeing with Terms of Service
 /// @notice Non-whitelisted users can mint tokens if they sign a message agreeing with Terms of Service
 /// @notice Fees are enforced on all user mints, and set by admins
-contract SoulBoundToken is ERC721Enumerable, Ownable, Pausable, ISoulBoundToken {
+contract SoulBoundToken is ERC721Enumerable, Ownable2Step, Pausable, ISoulBoundToken {
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/

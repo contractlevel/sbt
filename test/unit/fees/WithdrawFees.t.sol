@@ -28,6 +28,8 @@ contract WithdrawFeesTest is BaseTest {
         _changePrank(owner);
         RejectEth rejectEth = new RejectEth();
         sbt.transferOwnership(address(rejectEth));
+        _changePrank(address(rejectEth));
+        sbt.acceptOwnership();
 
         _changePrank(address(rejectEth));
         vm.expectRevert(abi.encodeWithSignature("SoulBoundToken__WithdrawFailed()"));
