@@ -60,8 +60,6 @@ contract SoulBoundToken is ERC721Enumerable, Ownable2Step, Pausable, ISoulBoundT
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
     //////////////////////////////////////////////////////////////*/
-    /// @dev Chainlink price feeds return answers with 8 decimals so we need this to calculate fee
-    uint256 internal constant PRICE_FEED_PRECISION = 10 ** 8;
     /// @dev Grace period for sequencer uptime feed
     uint256 internal constant GRACE_PERIOD_TIME = 120 seconds;
 
@@ -71,6 +69,8 @@ contract SoulBoundToken is ERC721Enumerable, Ownable2Step, Pausable, ISoulBoundT
     uint256 internal immutable i_priceFeedStalenessThreshold;
     /// @dev Chainlink price feed for sequencer uptime
     IAggregatorV3 internal immutable i_sequencerUptimeFeed;
+    /// @dev Price feed precision
+    uint256 internal immutable i_priceFeedPrecision;
 
     /// @dev Hash of contract URI (which is intended to be IPFS resource for Terms of Service)
     bytes32 internal s_termsHash;
@@ -140,7 +140,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable2Step, Pausable, ISoulBoundT
         uint256 priceFeedStalenessThreshold,
         address sequencerUptimeFeed
     ) ERC721(name, symbol) Ownable(owner) {
-        for (uint256 i = 0; i < admins.length; ++i) {
+        for (uint256 i; i < admins.length; ++i) {
             _setAdmin(admins[i], true);
         }
         _setContractURI(initialContractURI);
@@ -149,6 +149,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable2Step, Pausable, ISoulBoundT
         i_nativeUsdFeed = IAggregatorV3(nativeUsdFeed);
         i_priceFeedStalenessThreshold = priceFeedStalenessThreshold;
         i_sequencerUptimeFeed = IAggregatorV3(sequencerUptimeFeed);
+        i_priceFeedPrecision = 10 ** i_nativeUsdFeed.decimals();
         _hashTerms(initialContractURI);
     }
 
@@ -179,7 +180,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable2Step, Pausable, ISoulBoundT
         uint256 startId = _incrementTokenIdCounter(accounts.length);
 
         uint256[] memory tokenIds = new uint256[](accounts.length);
-        for (uint256 i = 0; i < accounts.length; ++i) {
+        for (uint256 i; i < accounts.length; ++i) {
             _mintAsAdminChecks(accounts[i]);
             tokenIds[i] = startId + i;
             _safeMint(accounts[i], tokenIds[i]);
@@ -244,7 +245,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable2Step, Pausable, ISoulBoundT
     /// @notice This function is only callable by the contract admins
     function batchAddToWhitelist(address[] calldata accounts) external onlyAdmin {
         _revertIfEmptyArray(accounts);
-        for (uint256 i = 0; i < accounts.length; ++i) {
+        for (uint256 i; i < accounts.length; ++i) {
             _addToWhitelist(accounts[i]);
         }
     }
@@ -263,7 +264,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable2Step, Pausable, ISoulBoundT
     /// @notice This function is only callable by the contract admins
     function batchRemoveFromWhitelist(address[] calldata accounts) external onlyAdmin {
         _revertIfEmptyArray(accounts);
-        for (uint256 i = 0; i < accounts.length; ++i) {
+        for (uint256 i; i < accounts.length; ++i) {
             _removeFromWhitelist(accounts[i]);
         }
     }
@@ -288,7 +289,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable2Step, Pausable, ISoulBoundT
     /// @dev Removes each account from the whitelist if present
     function batchAddToBlacklist(address[] calldata accounts) external onlyAdmin {
         _revertIfEmptyArray(accounts);
-        for (uint256 i = 0; i < accounts.length; ++i) {
+        for (uint256 i; i < accounts.length; ++i) {
             _addToBlacklist(accounts[i]);
         }
     }
@@ -307,7 +308,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable2Step, Pausable, ISoulBoundT
     /// @notice This function is only callable by the contract admins
     function batchRemoveFromBlacklist(address[] calldata accounts) external onlyAdmin {
         _revertIfEmptyArray(accounts);
-        for (uint256 i = 0; i < accounts.length; ++i) {
+        for (uint256 i; i < accounts.length; ++i) {
             _removeFromBlacklist(accounts[i]);
         }
     }
@@ -330,7 +331,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable2Step, Pausable, ISoulBoundT
     /// @notice Only the owner can set the admin status
     function batchSetAdmin(address[] calldata accounts, bool isAdmin) external onlyOwner {
         _revertIfEmptyArray(accounts);
-        for (uint256 i = 0; i < accounts.length; ++i) {
+        for (uint256 i; i < accounts.length; ++i) {
             _setAdminChecks(accounts[i], isAdmin);
             _setAdmin(accounts[i], isAdmin);
         }
@@ -360,7 +361,6 @@ contract SoulBoundToken is ERC721Enumerable, Ownable2Step, Pausable, ISoulBoundT
     function _mintSoulBoundToken(address account) internal returns (uint256 tokenId) {
         tokenId = _incrementTokenIdCounter(1);
         _safeMint(account, tokenId);
-        return tokenId;
     }
 
     /// @dev Increments the tokenID counter
@@ -370,7 +370,6 @@ contract SoulBoundToken is ERC721Enumerable, Ownable2Step, Pausable, ISoulBoundT
     function _incrementTokenIdCounter(uint256 count) internal returns (uint256 startId) {
         startId = s_tokenIdCounter;
         s_tokenIdCounter += count;
-        return startId;
     }
 
     /// @param account Address to check
@@ -583,7 +582,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable2Step, Pausable, ISoulBoundT
         // read fee factor directly to output variable
         fee = s_feeFactor;
         // only do extra work if non-zero
-        if (fee != 0) fee = FixedPointMathLib.fullMulDivUp(fee, PRICE_FEED_PRECISION, _getLatestPrice());
+        if (fee != 0) fee = FixedPointMathLib.fullMulDivUp(fee, i_priceFeedPrecision, _getLatestPrice());
     }
 
     /*//////////////////////////////////////////////////////////////
