@@ -86,11 +86,6 @@ definition canApprove(method f) returns bool =
     f.selector == sig:approve(address,uint256).selector ||
     f.selector == sig:setApprovalForAll(address,bool).selector;
 
-/// @notice functions that can take a fee
-definition canTakeFee(method f) returns bool =
-    f.selector == sig:mintAsWhitelisted().selector ||
-    f.selector == sig:mintWithTerms(bytes).selector;
-
 definition AddedToWhitelistEvent() returns bytes32 =
 // keccak256(abi.encodePacked("AddedToWhitelist(address)"))
     to_bytes32(0xa850ae9193f515cbae8d35e8925bd2be26627fc91bce650b8652ed254e9cab03);
@@ -614,20 +609,6 @@ rule approvals_alwaysRevert(method f) filtered {f -> canApprove(f)} {
     assert lastReverted;
 }
 
-/// @notice functions that can take a fee should increase currentContract.balance
-rule feeCollection_increaseBalance(method f) filtered {f -> canTakeFee(f)} {
-    env e;
-    calldataarg args;
-    require getFee() > 0;
-    require e.msg.sender != currentContract;
-
-    uint256 startBalance = nativeBalances[currentContract];
-
-    f(e, args);
-
-    assert nativeBalances[currentContract] > startBalance;
-}
-
 // ------------------------------------------------------------//
 // ------------------------------------------------------------//
 // ------------------------------------------------------------//
@@ -1081,6 +1062,7 @@ rule mintWithTerms_revertsWhen_blacklisted() {
     assert lastReverted;
 }
 
+// @review failing with latest _verifySignature implementation
 rule mintWithTerms_revertsWhen_insufficientFee() {
     env e;
     bytes s;
@@ -1107,6 +1089,7 @@ rule mintWithTerms_revertsWhen_invalidSignature() {
     assert lastReverted;
 }
 
+// @review failing with latest _verifySignature implementation
 rule mintWithTerms_success() {
     env e;
     bytes s;

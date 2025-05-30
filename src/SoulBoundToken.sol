@@ -9,6 +9,7 @@ import {
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
@@ -42,7 +43,6 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, Pausable, ISoulBoundToken 
     error SoulBoundToken__AdminStatusAlreadySet(address account, bool isAdmin);
     error SoulBoundToken__AlreadyMinted(address account);
     error SoulBoundToken__EmptyArray();
-    error SoulBoundToken__WhitelistEnabled();
     error SoulBoundToken__InvalidSignature();
     error SoulBoundToken__InsufficientFee();
     error SoulBoundToken__WithdrawFailed();
@@ -508,8 +508,10 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, Pausable, ISoulBoundToken 
         //slither-disable-next-line unused-return
         (address recovered, ECDSA.RecoverError error,) = ECDSA.tryRecover(ethSignedMessageHash, signature);
 
-        /// @dev return false if errors or incorrect signer
-        return error == ECDSA.RecoverError.NoError && recovered == msg.sender;
+        /// @dev if the signer is an EOA, return true if the signature is valid
+        if (error == ECDSA.RecoverError.NoError && recovered == msg.sender) return true;
+        /// @dev else check if the signature is valid for a smart contract
+        else return SignatureChecker.isValidERC1271SignatureNow(msg.sender, ethSignedMessageHash, signature);
     }
 
     /// @param newContractURI SBT contract URI (intended to be IPFS resource)

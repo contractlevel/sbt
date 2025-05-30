@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {SoulBoundToken, ECDSA, MessageHashUtils} from "../../src/SoulBoundToken.sol";
+import {SoulBoundToken, ECDSA, MessageHashUtils, SignatureChecker} from "../../src/SoulBoundToken.sol";
 
 contract Harness is SoulBoundToken {
     constructor(
@@ -31,8 +31,10 @@ contract Harness is SoulBoundToken {
         /// @dev attempt to recover the signer
         (address recovered, ECDSA.RecoverError error,) = ECDSA.tryRecover(ethSignedMessageHash, signature);
 
-        /// @dev return false if errors or incorrect signer
-        return error == ECDSA.RecoverError.NoError && recovered == signer;
+        /// @dev if the signer is an EOA, return true if the signature is valid
+        if (error == ECDSA.RecoverError.NoError && recovered == signer) return true;
+        /// @dev else check if the signature is valid for a smart contract
+        else return SignatureChecker.isValidERC1271SignatureNow(signer, ethSignedMessageHash, signature);
     }
 
     function keccakHash(string memory input) public returns (bytes32) {
