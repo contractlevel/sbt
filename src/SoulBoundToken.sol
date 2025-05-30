@@ -12,6 +12,7 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import {FixedPointMathLib} from "solady/utils/FixedPointMathLib.sol";
 import {IAggregatorV3} from "./interfaces/IAggregatorV3.sol";
 import {IAggregator} from "./interfaces/IAggregator.sol";
 import {ISoulBoundToken} from "./interfaces/ISoulBoundToken.sol";
@@ -578,10 +579,11 @@ contract SoulBoundToken is ERC721Enumerable, Ownable, Pausable, ISoulBoundToken 
     }
 
     /// @dev gets the fee for minting
-    function _getFee() internal view returns (uint256) {
-        uint256 feeFactor = s_feeFactor;
-        if (feeFactor == 0) return 0;
-        else return (feeFactor * PRICE_FEED_PRECISION) / _getLatestPrice();
+    function _getFee() internal view returns (uint256 fee) {
+        // read fee factor directly to output variable
+        fee = s_feeFactor;
+        // only do extra work if non-zero
+        if (fee != 0) fee = FixedPointMathLib.fullMulDivUp(fee, PRICE_FEED_PRECISION, _getLatestPrice());
     }
 
     /*//////////////////////////////////////////////////////////////
