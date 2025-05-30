@@ -169,23 +169,22 @@ contract SoulBoundToken is ERC721Enumerable, Ownable2Step, Pausable, ISoulBoundT
 
     /// @dev Mints a new token to each of the specified addresses
     /// @param accounts Addresses to mint the tokens to
-    /// @return uint256[] The IDs of the minted tokens
+    /// @return tokenIds The IDs of the minted tokens
     /// @dev Revert if accounts array is empty
     /// @dev Revert if any of the accounts are blacklisted
     /// @dev Revert if any of the accounts already hold a token
     /// @notice ERC721 reverts if any of the accounts == zero address
     /// @notice This function is only callable by the contract admins
-    function batchMintAsAdmin(address[] calldata accounts) external onlyAdmin returns (uint256[] memory) {
+    function batchMintAsAdmin(address[] calldata accounts) external onlyAdmin returns (uint256[] memory tokenIds) {
         _revertIfEmptyArray(accounts);
         uint256 startId = _incrementTokenIdCounter(accounts.length);
 
-        uint256[] memory tokenIds = new uint256[](accounts.length);
+        tokenIds = new uint256[](accounts.length);
         for (uint256 i; i < accounts.length; ++i) {
             _mintAsAdminChecks(accounts[i]);
             tokenIds[i] = startId + i;
             _safeMint(accounts[i], tokenIds[i]);
         }
-        return tokenIds;
     }
 
     /// @dev Mints a new token to the msg.sender if they are whitelisted
@@ -214,7 +213,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable2Step, Pausable, ISoulBoundT
     /// @dev Revert if signature is invalid
     /// @dev Revert if msg.sender already holds a token
     /// @dev Revert if contract is paused
-    function mintWithTerms(bytes memory signature) external payable whenNotPaused returns (uint256 tokenId) {
+    function mintWithTerms(bytes calldata signature) external payable whenNotPaused returns (uint256 tokenId) {
         _revertIfIncorrectFee();
         _revertIfBlacklisted(msg.sender);
         _revertIfAlreadyMinted(msg.sender);
@@ -337,18 +336,21 @@ contract SoulBoundToken is ERC721Enumerable, Ownable2Step, Pausable, ISoulBoundT
     }
 
     /// @notice Owner only function for withdrawing fees
-    /// @param amountToWithdraw The amount of address(this).balance to withdraw
     /// @dev Revert if caller is not owner
-    /// @dev Revert if amountToWithdraw is 0
-    /// @dev Revert if amountToWithdraw is more than contract balance
+    /// @notice Withdraws contract balance to owner
     //slither-disable-next-line reentrancy-events
-    function withdrawFees(uint256 amountToWithdraw) external onlyOwner {
-        if (amountToWithdraw == 0) revert SoulBoundToken__NoZeroValue();
-        if (amountToWithdraw > address(this).balance) revert SoulBoundToken__InsufficientBalance();
-        //slither-disable-next-line low-level-calls
-        (bool success,) = payable(msg.sender).call{value: amountToWithdraw}("");
-        if (!success) revert SoulBoundToken__WithdrawFailed();
-        emit FeesWithdrawn(amountToWithdraw);
+    function withdrawFees() external onlyOwner {
+        uint256 amountToWithdraw = address(this).balance;
+        if (amountToWithdraw > 0) {
+            // from https://github.com/Vectorized/solady/blob/main/src/utils/SafeTransferLib.sol#L90-L98 /// @solidity memory-safe-assembly
+            assembly {
+                if iszero(call(gas(), caller(), amountToWithdraw, codesize(), 0x00, codesize(), 0x00)) {
+                    mstore(0x00, 0xefde920d) // `SoulBoundToken__WithdrawFailed()`.
+                    revert(0x1c, 0x04)
+                }
+            }
+            emit FeesWithdrawn(amountToWithdraw);
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -514,7 +516,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable2Step, Pausable, ISoulBoundT
     /// @notice This function verifies whether a signature is valid or not
     /// @param signature Signed and passed by the user when minting
     /// @return isValid True if the signature is valid, false if not
-    function _verifySignature(bytes memory signature) internal view returns (bool) {
+    function _verifySignature(bytes calldata signature) internal view returns (bool) {
         /// @dev compute the message hash: keccak256(termsHash, msg.sender)
         bytes32 messageHash = keccak256(abi.encodePacked(s_termsHash, msg.sender));
 

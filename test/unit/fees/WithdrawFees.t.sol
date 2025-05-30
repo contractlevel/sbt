@@ -7,19 +7,7 @@ contract WithdrawFeesTest is BaseTest {
     function test_sbt_withdrawFees_revertsWhen_notOwner() public {
         _changePrank(notOwner);
         vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", notOwner));
-        sbt.withdrawFees(1);
-    }
-
-    function test_sbt_withdrawFees_revertsWhen_zeroAmount() public {
-        _changePrank(owner);
-        vm.expectRevert(abi.encodeWithSignature("SoulBoundToken__NoZeroValue()"));
-        sbt.withdrawFees(0);
-    }
-
-    function test_sbt_withdrawFees_revertsWhen_insufficientBalance() public {
-        _changePrank(owner);
-        vm.expectRevert(abi.encodeWithSignature("SoulBoundToken__InsufficientBalance()"));
-        sbt.withdrawFees(1);
+        sbt.withdrawFees();
     }
 
     function test_sbt_withdrawFees_revertsWhen_withdrawalFailed() public {
@@ -33,7 +21,7 @@ contract WithdrawFeesTest is BaseTest {
 
         _changePrank(address(rejectEth));
         vm.expectRevert(abi.encodeWithSignature("SoulBoundToken__WithdrawFailed()"));
-        sbt.withdrawFees(1);
+        sbt.withdrawFees();
     }
 
     function test_sbt_withdrawFees_success() public {
@@ -47,7 +35,7 @@ contract WithdrawFeesTest is BaseTest {
 
         /// @dev act
         _changePrank(owner);
-        sbt.withdrawFees(accumulatedFees);
+        sbt.withdrawFees();
 
         /// @dev assert
         assertEq(owner.balance, ownerInitialBalance + accumulatedFees, "Owner should receive fees");

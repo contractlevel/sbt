@@ -421,15 +421,15 @@ contract Handler is Test {
         sbt.setContractURI(contractURI);
     }
 
-    function withdrawFees(uint256 amountToWithdraw) external {
-        if (address(sbt).balance == 0) return;
-        amountToWithdraw = bound(amountToWithdraw, 1, address(sbt).balance);
+    function withdrawFees() external {
+        uint256 amountToWithdraw = address(sbt).balance;
+        if (amountToWithdraw == 0) return;
 
         /// @dev update ghosts
         g_totalFeesWithdrawn += amountToWithdraw;
 
         _changePrank(owner);
-        sbt.withdrawFees(amountToWithdraw);
+        sbt.withdrawFees();
     }
 
     function setFeeFactor(uint256 adminSeed, uint256 feeFactor) external {
