@@ -29,7 +29,7 @@ contract MintWithTermsTest is BaseTest {
         bytes memory signature = _createSignature(user, userPk, sbt.getTermsHash());
 
         _changePrank(user);
-        vm.expectRevert(abi.encodeWithSignature("SoulBoundToken__InsufficientFee()"));
+        vm.expectRevert(abi.encodeWithSignature("SoulBoundToken__IncorrectFee()"));
         sbt.mintWithTerms{value: fee - 1}(signature);
     }
 

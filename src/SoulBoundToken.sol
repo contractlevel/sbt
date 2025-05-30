@@ -48,7 +48,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable2Step, Pausable, ISoulBoundT
     error SoulBoundToken__AlreadyMinted(address account);
     error SoulBoundToken__EmptyArray();
     error SoulBoundToken__InvalidSignature();
-    error SoulBoundToken__InsufficientFee();
+    error SoulBoundToken__IncorrectFee();
     error SoulBoundToken__WithdrawFailed();
     error SoulBoundToken__NoZeroValue();
     error SoulBoundToken__InsufficientBalance();
@@ -193,9 +193,9 @@ contract SoulBoundToken is ERC721Enumerable, Ownable2Step, Pausable, ISoulBoundT
     /// @dev Revert if whitelist is disabled
     /// @dev Revert if msg.sender is not whitelisted
     /// @dev Revert if msg.sender already holds a token
-    /// @notice The msg.value can be higher than the fee, excess value will be kept by the contract
+    /// @dev Revert if msg.value is not equal to the fee
     function mintAsWhitelisted() external payable returns (uint256 tokenId) {
-        _revertIfInsufficientFee();
+        _revertIfIncorrectFee();
         if (!_isWhitelistEnabled()) revert SoulBoundToken__WhitelistDisabled();
         _revertIfNotWhitelisted(msg.sender);
         _revertIfAlreadyMinted(msg.sender);
@@ -210,18 +210,17 @@ contract SoulBoundToken is ERC721Enumerable, Ownable2Step, Pausable, ISoulBoundT
     /// @notice This function requires a signature from the msg.sender, including the hash of this token's contract URI
     /// The contract URI is intended to be an IPFS reference containing Terms of Service for token holders.
     /// @param signature Signed by msg.sender with Terms of Service hash
-    /// @dev Revert if insufficient fee (ie msg.value is less than getFee())
+    /// @dev Revert if msg.value is not equal to the fee
     /// @dev Revert if signature is invalid
     /// @dev Revert if msg.sender already holds a token
     /// @dev Revert if contract is paused
-    /// @notice The msg.value can be higher than the fee, excess value will be kept by the contract
     function mintWithTerms(bytes memory signature) external payable whenNotPaused returns (uint256 tokenId) {
-        _revertIfInsufficientFee();
+        _revertIfIncorrectFee();
         _revertIfBlacklisted(msg.sender);
         _revertIfAlreadyMinted(msg.sender);
 
         if (!_verifySignature(signature)) revert SoulBoundToken__InvalidSignature();
-        else emit SignatureVerified(msg.sender, signature);
+        emit SignatureVerified(msg.sender, signature);
 
         tokenId = _mintSoulBoundToken(msg.sender);
 
@@ -541,8 +540,8 @@ contract SoulBoundToken is ERC721Enumerable, Ownable2Step, Pausable, ISoulBoundT
     }
 
     /// @dev reverts if msg.value is less than fee
-    function _revertIfInsufficientFee() internal view {
-        if (msg.value < _getFee()) revert SoulBoundToken__InsufficientFee();
+    function _revertIfIncorrectFee() internal view {
+        if (msg.value != _getFee()) revert SoulBoundToken__IncorrectFee();
     }
 
     /// @dev returns the latest native/USD price

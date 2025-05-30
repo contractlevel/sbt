@@ -27,7 +27,7 @@ contract MintAsWhitelistedTest is BaseTest {
         uint256 fee = _setFeeFactorAndDealFee(1e18, whitelisted);
 
         _changePrank(whitelisted);
-        vm.expectRevert(abi.encodeWithSignature("SoulBoundToken__InsufficientFee()"));
+        vm.expectRevert(abi.encodeWithSignature("SoulBoundToken__IncorrectFee()"));
         sbt.mintAsWhitelisted{value: fee - 1}();
     }
 
