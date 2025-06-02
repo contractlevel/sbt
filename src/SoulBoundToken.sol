@@ -56,6 +56,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable2Step, Pausable, ISoulBoundT
     error SoulBoundToken__SequencerDown();
     error SoulBoundToken__GracePeriodNotOver();
     error SoulBoundToken__InvalidPrice();
+    error SoulBoundToken__InvalidRound();
 
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
@@ -555,6 +556,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable2Step, Pausable, ISoulBoundT
         //slither-disable-next-line unused-return
         (, int256 answer, uint256 startedAt,,) = i_sequencerUptimeFeed.latestRoundData();
         if (answer != 0) revert SoulBoundToken__SequencerDown();
+        if (startedAt == 0) revert SoulBoundToken__InvalidRound();
         //slither-disable-next-line timestamp
         if (_getGracePeriodActive(startedAt)) revert SoulBoundToken__GracePeriodNotOver();
 
