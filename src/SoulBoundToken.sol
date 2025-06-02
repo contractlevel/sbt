@@ -554,7 +554,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable2Step, Pausable, ISoulBoundT
     function _getLatestPrice() internal view returns (uint256) {
         //slither-disable-next-line unused-return
         (, int256 answer, uint256 startedAt,,) = i_sequencerUptimeFeed.latestRoundData();
-        if (answer == 1) revert SoulBoundToken__SequencerDown();
+        if (answer != 0) revert SoulBoundToken__SequencerDown();
         //slither-disable-next-line timestamp
         if (_getGracePeriodActive(startedAt)) revert SoulBoundToken__GracePeriodNotOver();
 
@@ -562,7 +562,7 @@ contract SoulBoundToken is ERC721Enumerable, Ownable2Step, Pausable, ISoulBoundT
         (, int256 price,, uint256 updatedAt,) = i_nativeUsdFeed.latestRoundData();
 
         IAggregator aggregator = IAggregator(i_nativeUsdFeed.aggregator());
-        if (price < aggregator.minAnswer() || price > aggregator.maxAnswer()) revert SoulBoundToken__InvalidPrice();
+        if (price <= aggregator.minAnswer() || price >= aggregator.maxAnswer()) revert SoulBoundToken__InvalidPrice();
 
         //slither-disable-next-line timestamp
         if (updatedAt < block.timestamp - i_priceFeedStalenessThreshold) revert SoulBoundToken__StalePriceFeed();
