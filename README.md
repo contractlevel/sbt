@@ -2,6 +2,8 @@
 
 A SoulBoundToken contract for Optimism with administrative whitelist and blacklist functionality. Only one token can be held per address. Tokens cannot be transferred or approved.
 
+This codebase has been reviewed by [Cyfrin](https://www.cyfrin.io/). The final report can be read in [Cyfrin Audit Reports](https://github.com/Cyfrin/cyfrin-audit-reports/blob/main/reports/2025-06-02-cyfrin-evo-soulboundtoken-v2.0.pdf).
+
 ## Table of Contents
 
 - [SoulBoundToken](#soulboundtoken)
