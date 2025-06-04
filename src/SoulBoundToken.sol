@@ -17,8 +17,6 @@ import {IAggregatorV3} from "./interfaces/IAggregatorV3.sol";
 import {IAggregator} from "./interfaces/IAggregator.sol";
 import {ISoulBoundToken} from "./interfaces/ISoulBoundToken.sol";
 
-import {console2} from "forge-std/Test.sol";
-
 /// @title SoulBoundToken
 /// @author @contractlevel
 /// @notice Non-transferrable ERC721 token with administrative whitelist and blacklist functionality
