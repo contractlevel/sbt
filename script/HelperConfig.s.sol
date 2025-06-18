@@ -40,14 +40,19 @@ contract HelperConfig is Script {
     }
 
     function getOptimismConfig() public pure returns (NetworkConfig memory) {
+        address[] memory optimismAdmins = new address[](3);
+        optimismAdmins[0] = 0xfaCd87e98C1bdcd9F33cDD494586926F540FeC89;
+        optimismAdmins[1] = 0x5684db5DAb7EA39A256ede0445636aC00e9B299e;
+        optimismAdmins[2] = 0x32E49679281941534fe466b97A28165D23B1fFA9;
+
         return NetworkConfig({
             name: "Evo Labs DAO Membership",
             symbol: "EVO",
             contractURI: "ipfs://QmfKN2Cq3HSNXVr36MXHdRMvH2PDrby3y1cH1aRFbTkf4C/", // @review dummy value, replace in production
             whitelistEnabled: true,
             nativeUsdFeed: 0xb7B9A39CC63f856b90B364911CC324dC46aC1770, // https://docs.chain.link/data-feeds/price-feeds/addresses?page=1&network=optimism&search=eth
-            owner: address(1), // @review dummy value, replace in production
-            admins: _createAdminsArray(), // @review dummy value, replace in production
+            owner: 0xc8654eAF0313Fa702c52000BCf2e38B3339C90B5,
+            admins: optimismAdmins,
             priceFeedStalenessThreshold: 1200 seconds, // https://docs.chain.link/data-feeds/price-feeds/addresses/?network=optimism&page=1&testnetPage=1&search=eth%2Fusd#data-feed-best-practices
             sequencerUptimeFeed: 0x371EAD81c9102C9BF4874A9075FFFf170F2Ee389 // https://docs.chain.link/data-feeds/l2-sequencer-feeds#op
         });
