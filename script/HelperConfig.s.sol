@@ -48,7 +48,7 @@ contract HelperConfig is Script {
         return NetworkConfig({
             name: "Evo Labs DAO Membership",
             symbol: "EVO",
-            contractURI: "ipfs://QmfKN2Cq3HSNXVr36MXHdRMvH2PDrby3y1cH1aRFbTkf4C/", // @review dummy value, replace in production
+            contractURI: "https://docs.fileverse.io/0x3EF27DC9A11807322A370021F7C5A3f51Ee1B2CE/4#key=YwuKpn6EyGSqmycYTgi6j1ZZTSXuSfLWVU7bdgH9uX31oPTdaoqjvmCDxi-PTZLY",
             whitelistEnabled: true,
             nativeUsdFeed: 0xb7B9A39CC63f856b90B364911CC324dC46aC1770, // https://docs.chain.link/data-feeds/price-feeds/addresses?page=1&network=optimism&search=eth
             owner: 0xc8654eAF0313Fa702c52000BCf2e38B3339C90B5,
@@ -62,11 +62,11 @@ contract HelperConfig is Script {
         return NetworkConfig({
             name: "Evo Labs DAO Membership",
             symbol: "EVO",
-            contractURI: "ipfs://QmfKN2Cq3HSNXVr36MXHdRMvH2PDrby3y1cH1aRFbTkf4C/", // dummy value, replace in production
+            contractURI: "https://docs.fileverse.io/0x3EF27DC9A11807322A370021F7C5A3f51Ee1B2CE/4#key=YwuKpn6EyGSqmycYTgi6j1ZZTSXuSfLWVU7bdgH9uX31oPTdaoqjvmCDxi-PTZLY",
             whitelistEnabled: true,
             nativeUsdFeed: 0x694AA1769357215DE4FAC081bf1f309aDC325306,
-            owner: address(1), // dummy value, replace in production
-            admins: _createAdminsArray(), // dummy value, replace in production
+            owner: 0xc8654eAF0313Fa702c52000BCf2e38B3339C90B5,
+            admins: optimismAdmins,
             priceFeedStalenessThreshold: 3600 seconds, // https://docs.chain.link/data-feeds/price-feeds/addresses/?network=ethereum&page=1&testnetPage=1&testnetSearch=eth%2Fusd#sepolia-testnet
             sequencerUptimeFeed: address(0) // @review
         });
