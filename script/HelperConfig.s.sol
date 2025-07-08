@@ -50,7 +50,7 @@ contract HelperConfig is Script {
             symbol: "EVO",
             contractURI: "https://docs.fileverse.io/0x3EF27DC9A11807322A370021F7C5A3f51Ee1B2CE/4#key=YwuKpn6EyGSqmycYTgi6j1ZZTSXuSfLWVU7bdgH9uX31oPTdaoqjvmCDxi-PTZLY",
             whitelistEnabled: true,
-            nativeUsdFeed: 0xb7B9A39CC63f856b90B364911CC324dC46aC1770, // https://docs.chain.link/data-feeds/price-feeds/addresses?page=1&network=optimism&search=eth
+            nativeUsdFeed: 0x13e3Ee699D1909E989722E753853AE30b17e08c5, // https://docs.chain.link/data-feeds/price-feeds/addresses?page=1&network=optimism&search=eth
             owner: 0xc8654eAF0313Fa702c52000BCf2e38B3339C90B5,
             admins: optimismAdmins,
             priceFeedStalenessThreshold: 1200 seconds, // https://docs.chain.link/data-feeds/price-feeds/addresses/?network=optimism&page=1&testnetPage=1&search=eth%2Fusd#data-feed-best-practices
@@ -59,13 +59,18 @@ contract HelperConfig is Script {
     }
 
     function getEthSepoliaConfig() public pure returns (NetworkConfig memory) {
+        address[] memory optimismAdmins = new address[](3);
+        optimismAdmins[0] = 0xfaCd87e98C1bdcd9F33cDD494586926F540FeC89;
+        optimismAdmins[1] = 0x5684db5DAb7EA39A256ede0445636aC00e9B299e;
+        optimismAdmins[2] = 0x32E49679281941534fe466b97A28165D23B1fFA9;
+
         return NetworkConfig({
             name: "Evo Labs DAO Membership",
             symbol: "EVO",
             contractURI: "https://docs.fileverse.io/0x3EF27DC9A11807322A370021F7C5A3f51Ee1B2CE/4#key=YwuKpn6EyGSqmycYTgi6j1ZZTSXuSfLWVU7bdgH9uX31oPTdaoqjvmCDxi-PTZLY",
             whitelistEnabled: true,
             nativeUsdFeed: 0x694AA1769357215DE4FAC081bf1f309aDC325306,
-            owner: 0xc8654eAF0313Fa702c52000BCf2e38B3339C90B5,
+            owner: 0xc8654eAF0313Fa702c52000BCf2e38B3339C90B5, // optimism mainnet multisig
             admins: optimismAdmins,
             priceFeedStalenessThreshold: 3600 seconds, // https://docs.chain.link/data-feeds/price-feeds/addresses/?network=ethereum&page=1&testnetPage=1&testnetSearch=eth%2Fusd#sepolia-testnet
             sequencerUptimeFeed: address(0) // @review
